@@ -373,6 +373,22 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
             $routes->post('subscribe/(:num)', 'PlansController::subscribe/$1');
         });
 
+        // Media library routes
+        $routes->group('media', ['filter' => 'permission:media.view'], function ($routes) {
+            $routes->get('/', 'MediaController::index');
+            $routes->post('upload', 'MediaController::upload');
+            $routes->get('delete/(:num)', 'MediaController::delete/$1');
+        });
+
+        // Notification center routes
+        $routes->group('notifications', ['filter' => 'permission:notifications.view'], function ($routes) {
+            $routes->get('/', 'NotificationsController::index');
+            $routes->get('unread-count', 'NotificationsController::unreadCount');
+            $routes->get('unread', 'NotificationsController::unread');
+            $routes->post('mark-read/(:num)', 'NotificationsController::markRead/$1');
+            $routes->post('mark-all-read', 'NotificationsController::markAllRead');
+        });
+
         // Profile routes
         $routes->get('profile', 'ProfileController::index');
         $routes->post('profile', 'ProfileController::update');

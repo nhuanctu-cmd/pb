@@ -4,14 +4,14 @@ namespace Tests\Unit;
 
 use App\Services\AuthSecurityService;
 use CodeIgniter\Test\CIUnitTestCase;
-use CodeIgniter\Test\DatabaseTestTrait;
 
 /**
  * TC M1 — AuthSecurityService: chống brute-force + lịch sử mật khẩu
  */
 class AuthSecurityServiceTest extends CIUnitTestCase
 {
-    use DatabaseTestTrait;
+    // Không dùng DatabaseTestTrait vì test DB là snapshot cố định (pickball_test),
+    // không phải DB migrate từ đầu. Refresh sẽ drop toàn bộ bảng.
 
     protected AuthSecurityService $service;
     private string $testEmail = 'bruteforce-test@example.com';

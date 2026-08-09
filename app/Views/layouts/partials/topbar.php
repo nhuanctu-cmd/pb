@@ -15,7 +15,7 @@
         <a class="erp-btn" href="/locale/switch/<?= (session('locale') ?? 'en') === 'vi' ? 'en' : 'vi' ?>">
             <i class="bi bi-translate"></i> <?= strtoupper(session('locale') ?? 'EN') ?>
         </a>
-        <button class="erp-btn erp-btn-icon" type="button" aria-label="Thông báo"><i class="bi bi-bell"></i></button>
+        <?= view('layouts/partials/notification_bell') ?>
         <a class="erp-btn erp-btn-primary" href="/admin/bookings/create"><i class="bi bi-plus-lg"></i> Đặt sân</a>
         <div class="dropdown">
             <button class="erp-btn dropdown-toggle" data-bs-toggle="dropdown">

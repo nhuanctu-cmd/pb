@@ -27,6 +27,8 @@ $allMenu = [
         ['label' => lang('App.menu_users'),         'icon' => 'bi-people',          'url' => '/admin/users',         'active' => 'admin/users',         'perm' => 'users.view'],
         ['label' => lang('App.menu_roles'),         'icon' => 'bi-shield-lock',     'url' => '/admin/roles',         'active' => 'admin/roles',         'perm' => 'roles.view'],
         ['label' => lang('App.menu_payments'),      'icon' => 'bi-credit-card',     'url' => '/admin/payments',      'active' => 'admin/payments',      'perm' => 'payments.view'],
+        ['label' => lang('App.menu_media'),         'icon' => 'bi-images',          'url' => '/admin/media',         'active' => 'admin/media',         'perm' => 'media.view'],
+        ['label' => lang('App.menu_notifications'), 'icon' => 'bi-bell',           'url' => '/admin/notifications', 'active' => 'admin/notifications', 'perm' => 'notifications.view'],
         ['label' => lang('App.menu_audit_logs'),    'icon' => 'bi-journal-text',    'url' => '/admin/audit-logs',    'active' => 'admin/audit-logs',    'perm' => 'audit-logs.view'],
         ['label' => lang('App.menu_settings'),      'icon' => 'bi-gear',            'url' => '/admin/settings',      'active' => 'admin/settings',      'perm' => 'settings.view'],
     ],

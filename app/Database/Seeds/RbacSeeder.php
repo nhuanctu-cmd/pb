@@ -123,6 +123,15 @@ class RbacSeeder extends Seeder
         'audit-logs' => [
             'view' => 'Xem nhật ký hệ thống',
         ],
+        'media' => [
+            'view'   => 'Xem thư viện media',
+            'upload' => 'Upload file media',
+            'delete' => 'Xóa file media',
+        ],
+        'notifications' => [
+            'view'   => 'Xem thông báo',
+            'manage' => 'Quản lý mẫu thông báo',
+        ],
         'reports' => [
             'view'   => 'Xem báo cáo',
             'export' => 'Xuất báo cáo',
@@ -156,6 +165,8 @@ class RbacSeeder extends Seeder
             'roles.view',
             'settings.*',
             'audit-logs.view',
+            'media.*',
+            'notifications.*',
             'reports.*',
         ],
 
@@ -173,6 +184,8 @@ class RbacSeeder extends Seeder
             'memberships.view', 'memberships.create',
             'clubs.view', 'teams.view', 'matches.view', 'matches.manage',
             'settings.view',
+            'media.view', 'media.upload',
+            'notifications.view',
             'reports.view',
         ],
 

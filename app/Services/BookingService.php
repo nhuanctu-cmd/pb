@@ -32,17 +32,48 @@ class BookingService
      */
     public function createBooking(array $data): array
     {
-        $tenantId = $data['tenant_id'];
-        $branchId = $data['branch_id'];
+        $tenantId = (int) ($data['tenant_id'] ?? 0);
+        $branchId = (int) ($data['branch_id'] ?? 0);
 
-        // Validate court availability for each court in items
+        if (! $tenantId || ! $branchId || empty($data['items']) || ! is_array($data['items'])) {
+            return [
+                'success' => false,
+                'message' => lang('App.invalid_data'),
+            ];
+        }
+
+        foreach (['booking_date', 'start_time', 'end_time', 'customer_name', 'customer_phone'] as $field) {
+            if (empty($data[$field])) {
+                return ['success' => false, 'message' => lang('App.invalid_data')];
+            }
+        }
+
+        $db = \Config\Database::connect();
+        $db->transStart();
+
+        // Lock each court row before the final availability check. Concurrent
+        // requests for the same court are therefore serialized by MySQL.
         foreach ($data['items'] as $item) {
+            if (empty($item['court_id']) || empty($item['start_time']) || empty($item['end_time'])) {
+                $db->transRollback();
+                return ['success' => false, 'message' => lang('App.invalid_data')];
+            }
+
+            $courtId = (int) ($item['court_id'] ?? 0);
+            $courtRow = $db->query('SELECT id FROM courts WHERE id = ? FOR UPDATE', [$courtId])->getRow();
+            if (! $courtRow) {
+                $db->transRollback();
+                return ['success' => false, 'message' => 'Không tìm thấy sân.'];
+            }
+
             $bookable = $this->validateCourtBookable((int) $item['court_id'], (int) $branchId, $data['booking_date'], $item['start_time'], $item['end_time']);
             if (! $bookable['success']) {
+                $db->transRollback();
                 return $bookable;
             }
 
             if (!$this->checkCourtAvailable($item['court_id'], $data['booking_date'], $item['start_time'], $item['end_time'])) {
+                $db->transRollback();
                 return [
                     'success' => false,
                     'message' => lang('App.court_not_available', [$item['court_id']]),
@@ -62,9 +93,6 @@ class BookingService
         // Set expiry for pending bookings
         $expiryMinutes = (int) ($data['booking_expiry_minutes'] ?? 15);
         $expiresAt = date('Y-m-d H:i:s', strtotime('+' . $expiryMinutes . ' minutes'));
-
-        $db = \Config\Database::connect();
-        $db->transStart();
 
         // Create booking
         $bookingId = $this->bookingModel->insert([
@@ -87,6 +115,10 @@ class BookingService
             'source'          => $data['source'] ?? 'admin',
             'note'            => $data['note'] ?? null,
             'expires_at'      => $expiresAt,
+            'hold_until'      => $data['hold_until'] ?? null,
+            'is_hold'         => (int) ($data['is_hold'] ?? 0),
+            'timeout_minutes' => (int) ($data['timeout_minutes'] ?? $expiryMinutes),
+            'auto_release_at' => $data['auto_release_at'] ?? null,
             'created_by'      => $data['created_by'] ?? null,
         ]);
 
@@ -207,7 +239,12 @@ class BookingService
      */
     public function holdBooking(array $data): array
     {
-        $data['status'] = 'pending';
+        $timeoutMinutes = max(1, (int) ($data['timeout_minutes'] ?? 5));
+        $data['status'] = 'hold';
+        $data['is_hold'] = 1;
+        $data['timeout_minutes'] = $timeoutMinutes;
+        $data['hold_until'] = date('Y-m-d H:i:s', time() + ($timeoutMinutes * 60));
+        $data['auto_release_at'] = $data['hold_until'];
         return $this->createBooking($data);
     }
 
@@ -519,9 +556,10 @@ class BookingService
             $db->transStart();
 
             $this->bookingModel->update($booking->id, [
-                'status'          => 'cancelled',
+                'status'          => 'expired',
                 'cancelled_reason' => lang('App.auto_cancelled_expired'),
                 'cancelled_at'    => date('Y-m-d H:i:s'),
+                'is_hold'         => 0,
             ]);
 
             $this->bookingItemModel->where('booking_id', $booking->id)
@@ -532,7 +570,7 @@ class BookingService
             $this->bookingLogModel->addLog(
                 $booking->tenant_id, $booking->id,
                 'auto_cancelled',
-                'pending', 'cancelled',
+                $booking->status, 'expired',
                 lang('App.auto_cancelled_expired'),
                 null
             );

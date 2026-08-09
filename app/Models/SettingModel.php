@@ -67,6 +67,8 @@ class SettingModel extends Model
             'type'      => $type,
             'group'     => $group,
             'is_json'   => is_array($value) ? 1 : 0,
+            'is_active' => 1,
+            'status'    => 'active',
             'tenant_id' => $tenantId,
         ];
         if ($existing) {

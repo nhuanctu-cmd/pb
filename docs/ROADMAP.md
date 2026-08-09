@@ -50,7 +50,7 @@
 |---|--------|-----------|
 | M0 | Hạ tầng chạy (env/migrate/seed/git) | ✅ **HOÀN THÀNH** (09/08/2026) |
 | M1 | Core: Tenant + Auth + RBAC + SaaS Plan | ✅ **HOÀN THÀNH** (09/08/2026) |
-| M2 | Common: Settings + Media + Audit + Notification Engine | ⬜ |
+| M2 | Common: Settings + Media + Audit + Notification Engine | ✅ **HOÀN THÀNH** (09/08/2026) |
 | M3 | Facility (cụm sân/chi nhánh/sân/giá) | ⬜ |
 | M4 | Booking hoàn chỉnh | ⬜ |
 | M5 | Payment & Ví | ⬜ |
@@ -94,10 +94,13 @@
 - **SaaS hoàn chỉnh**: `PlanFilter` chặn POS/giải đấu nếu gói không có feature; trang `admin/plans` hiển thị gói hiện tại/usage/đăng ký; giới hạn tạo sân/ngườị chơi theo gói
 - Áp `TenantFilter` + `PermissionFilter` lên toàn bộ route admin; bỏ menu UI Demo
 
-### M2 — Common: Settings + Media + Audit + Notification Engine
-- Bảng `notifications`, `notification_templates` (vi/en, đa kênh email/in-app)
-- Chuông thông báo in-app + gửi email (queue đơn giản qua bảng jobs)
-- Media: upload + resize ảnh, chuẩn hóa storage
+### M2 — Common: Settings + Media + Audit + Notification Engine ✅
+- Bảng `notifications`, `notification_templates` (vi/en, đa kênh email/in-app), `jobs` (queue đơn giản)
+- Notification Engine: `NotificationService` (in-app + email queue + render biến `{{var}}`), chuông thông báo trên topbar + API unread-count/mark-read, trang trung tâm thông báo
+- Settings: trang cấu hình theo nhóm (general/booking/payment/notifications/business), tenant override → global default qua `SettingService`
+- Audit logs: lọc theo module/action/user/khoảng ngày + phân trang 50 dòng
+- Media library: upload ảnh tự resize ≤1600px + thumbnail 300px, lọc theo loại, copy URL, soft delete; storage `public/uploads/YYYY/MM/`
+- 19 test mới (Notification/Setting/Media/Job) → tổng 76 tests, 238 assertions OK
 
 ### M3 — Facility
 - Hoàn thiện CRUD cụm sân/chi nhánh/sân/loại sân/giờ mở cửa/ngày nghỉ/bảo trì/thiết bị

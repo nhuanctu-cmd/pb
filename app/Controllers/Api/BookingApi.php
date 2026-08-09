@@ -28,7 +28,7 @@ class BookingApi extends BaseController
         }
 
         if ($branchId) {
-            $bookings = $this->bookingModel->getByBranch((int) $branchId, $this->request->getGet());
+            $bookings = $this->bookingModel->getByBranch((int) $branchId, $this->request->getGet(), (int) $tenantId);
         } else {
             $bookings = $this->bookingModel
                 ->where('tenant_id', (int) $tenantId)
@@ -57,7 +57,10 @@ class BookingApi extends BaseController
             ]);
         }
 
-        $slots = $this->bookingService->getAvailableSlots((int)$courtId, $date);
+        $tenantId = $this->request->api_tenant_id ?? current_tenant_id();
+        $slots = $this->bookingService->getAvailableSlots(
+            (int) $courtId, $date, 60, $tenantId ? (int) $tenantId : null
+        );
 
         return $this->response->setJSON([
             'success' => true,
@@ -120,7 +123,10 @@ class BookingApi extends BaseController
      */
     public function detail($id)
     {
-        $booking = $this->bookingModel->find($id);
+        $tenantId = $this->request->api_tenant_id ?? current_tenant_id();
+        $booking = $tenantId
+            ? $this->bookingModel->findForTenant((int) $id, (int) $tenantId)
+            : null;
         if (!$booking) {
             return $this->response->setJSON([
                 'success' => false,
@@ -148,7 +154,11 @@ class BookingApi extends BaseController
         $reason = $this->request->getPost('reason') ?? lang('App.cancelled_via_api');
         $userId = $this->request->getPost('user_id');
 
-        $result = $this->bookingService->cancelBooking((int)$id, $reason, $userId ? (int)$userId : null);
+        $tenantId = $this->request->api_tenant_id ?? current_tenant_id();
+        $result = $this->bookingService->cancelBooking(
+            (int) $id, $reason, $userId ? (int) $userId : null,
+            $tenantId ? (int) $tenantId : null
+        );
 
         return $this->response->setJSON($result);
     }
@@ -169,7 +179,11 @@ class BookingApi extends BaseController
             ]);
         }
 
-        $result = $this->bookingService->checkInByQr($token, $userId ? (int)$userId : null);
+        $tenantId = $this->request->api_tenant_id ?? current_tenant_id();
+        $result = $this->bookingService->checkInByQr(
+            $token, $userId ? (int) $userId : null,
+            $tenantId ? (int) $tenantId : null
+        );
 
         return $this->response->setJSON($result);
     }

@@ -38,13 +38,37 @@ class InvoiceModel extends Model
         return $builder->orderBy('created_at', 'DESC')->limit($limit)->findAll();
     }
 
-    public function getWithDetails(int $invoiceId)
+    public function getWithDetails(int $invoiceId, ?int $tenantId = null)
     {
-        return $this->select('invoices.*, players.fullname as player_name, users.fullname as staff_name')
+        $builder = $this->select('invoices.*, players.fullname as player_name, users.fullname as staff_name')
             ->join('players', 'players.id = invoices.player_id', 'left')
             ->join('users', 'users.id = invoices.created_by', 'left')
-            ->where('invoices.id', $invoiceId)
+            ->where('invoices.id', $invoiceId);
+        if ($tenantId !== null) {
+            $builder->where('invoices.tenant_id', $tenantId);
+        }
+        return $builder->first();
+    }
+
+    public function findForTenant(int $invoiceId, int $tenantId): ?\App\Entities\Invoice
+    {
+        return $this->where('invoices.id', $invoiceId)
+            ->where('invoices.tenant_id', $tenantId)
             ->first();
+    }
+
+    public function findForUpdate(int $invoiceId, ?int $tenantId = null): ?\App\Entities\Invoice
+    {
+        $sql = 'SELECT * FROM invoices WHERE id = ?';
+        $params = [$invoiceId];
+        if ($tenantId !== null) {
+            $sql .= ' AND tenant_id = ?';
+            $params[] = $tenantId;
+        }
+        $sql .= ' LIMIT 1 FOR UPDATE';
+        $row = $this->db->query($sql, $params)->getRowArray();
+
+        return $row ? new \App\Entities\Invoice($row) : null;
     }
 
     public function getInvoicesByTenant(int $tenantId, ?int $branchId = null, ?string $status = null, int $limit = 100)

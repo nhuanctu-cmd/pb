@@ -36,7 +36,9 @@ class BookingsController extends BaseController
         $filters = [];
         if ($status) $filters['status'] = $status;
 
-        $bookings = $this->bookingModel->getByPlayer($playerId, $filters);
+        $bookings = $this->bookingModel->getByPlayer(
+            (int) $playerId, $filters, (int) session()->get('tenant_id')
+        );
 
         return view('player/bookings/index', [
             'bookings' => $bookings,
@@ -70,7 +72,9 @@ class BookingsController extends BaseController
             return $this->response->setJSON(['success' => false, 'message' => lang('App.invalid_data')]);
         }
 
-        $slots = $this->bookingService->getAvailableSlots($courtId, $date);
+        $slots = $this->bookingService->getAvailableSlots(
+            (int) $courtId, $date, 60, (int) session()->get('tenant_id')
+        );
 
         return $this->response->setJSON(['success' => true, 'slots' => $slots]);
     }
@@ -125,7 +129,7 @@ class BookingsController extends BaseController
     public function detail($id)
     {
         $playerId = session()->get('user_id');
-        $booking = $this->bookingModel->find($id);
+        $booking = $this->bookingModel->findForTenant((int) $id, (int) session()->get('tenant_id'));
 
         if (!$booking || $booking->player_id != $playerId) {
             return redirect()->to('/player/bookings')->with('error', lang('App.booking_not_found'));
@@ -147,14 +151,14 @@ class BookingsController extends BaseController
     public function cancel($id)
     {
         $playerId = session()->get('user_id');
-        $booking = $this->bookingModel->find($id);
+        $booking = $this->bookingModel->findForTenant((int) $id, (int) session()->get('tenant_id'));
 
         if (!$booking || $booking->player_id != $playerId) {
             return redirect()->to('/player/bookings')->with('error', lang('App.booking_not_found'));
         }
 
         $reason = $this->request->getPost('reason') ?? lang('App.cancelled_by_player');
-        $result = $this->bookingService->cancelBooking($id, $reason, $playerId);
+        $result = $this->bookingService->cancelBooking($id, $reason, $playerId, (int) session()->get('tenant_id'));
 
         if ($result['success']) {
             return redirect()->to('/player/bookings')->with('success', lang('App.booking_cancelled_success'));

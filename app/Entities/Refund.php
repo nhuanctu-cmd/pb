@@ -24,7 +24,7 @@ class Refund extends Entity
         'tenant_id' => 'integer',
         'payment_id' => 'integer',
         'invoice_id' => 'integer',
-        'amount' => 'decimal',
+        'amount' => 'float',
         'reason' => 'string',
         'status' => 'string',
         'processed_by' => 'integer',

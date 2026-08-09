@@ -16,6 +16,7 @@ class BookingService
     protected BookingLogModel $bookingLogModel;
     protected CourtModel $courtModel;
     protected PricingService $pricingService;
+    protected BookingStateMachine $stateMachine;
 
     public function __construct()
     {
@@ -25,6 +26,7 @@ class BookingService
         $this->bookingLogModel   = model(BookingLogModel::class);
         $this->courtModel        = model(CourtModel::class);
         $this->pricingService    = new PricingService();
+        $this->stateMachine      = new BookingStateMachine();
     }
 
     /**
@@ -50,6 +52,7 @@ class BookingService
 
         $db = \Config\Database::connect();
         $db->transStart();
+        $requestedIntervals = [];
 
         // Lock each court row before the final availability check. Concurrent
         // requests for the same court are therefore serialized by MySQL.
@@ -59,14 +62,26 @@ class BookingService
                 return ['success' => false, 'message' => lang('App.invalid_data')];
             }
 
+            if (! $this->isValidTimeRange((string) $item['start_time'], (string) $item['end_time'])) {
+                $db->transRollback();
+                return ['success' => false, 'message' => lang('App.invalid_data')];
+            }
+
             $courtId = (int) ($item['court_id'] ?? 0);
+            foreach ($requestedIntervals[$courtId] ?? [] as $interval) {
+                if ($item['start_time'] < $interval[1] && $item['end_time'] > $interval[0]) {
+                    $db->transRollback();
+                    return ['success' => false, 'message' => lang('App.court_not_available', [$courtId])];
+                }
+            }
+            $requestedIntervals[$courtId][] = [(string) $item['start_time'], (string) $item['end_time']];
             $courtRow = $db->query('SELECT id FROM courts WHERE id = ? FOR UPDATE', [$courtId])->getRow();
             if (! $courtRow) {
                 $db->transRollback();
                 return ['success' => false, 'message' => 'Không tìm thấy sân.'];
             }
 
-            $bookable = $this->validateCourtBookable((int) $item['court_id'], (int) $branchId, $data['booking_date'], $item['start_time'], $item['end_time']);
+            $bookable = $this->validateCourtBookable((int) $item['court_id'], (int) $tenantId, (int) $branchId, $data['booking_date'], $item['start_time'], $item['end_time']);
             if (! $bookable['success']) {
                 $db->transRollback();
                 return $bookable;
@@ -251,19 +266,42 @@ class BookingService
     /**
      * Confirm payment for a booking
      */
-    public function confirmPayment(int $bookingId, float $amount, ?int $userId = null): array
+    public function confirmPayment(int $bookingId, float $amount, ?int $userId = null, ?int $tenantId = null): array
     {
-        $booking = $this->bookingModel->find($bookingId);
-        if (!$booking) {
+        if ($amount <= 0) {
+            return ['success' => false, 'message' => lang('App.invalid_data')];
+        }
+
+        $db = \Config\Database::connect();
+        $db->transStart();
+        $booking = $this->findBookingForContext($bookingId, $tenantId, true);
+        if (! $booking) {
+            $db->transRollback();
             return ['success' => false, 'message' => lang('App.booking_not_found')];
         }
 
         $oldStatus = $booking->status;
         $oldPaymentStatus = $booking->payment_status;
+        $paidAmount = round((float) $booking->paid_amount + $amount, 2);
+        $totalAmount = round((float) $booking->total_amount, 2);
 
-        $paidAmount = $booking->paid_amount + $amount;
-        $paymentStatus = $paidAmount >= $booking->total_amount ? 'paid' : 'partial';
-        $newStatus = $paymentStatus === 'paid' ? 'reserved' : $booking->status;
+        if ($paidAmount > $totalAmount + 0.01) {
+            $db->transRollback();
+            return ['success' => false, 'message' => lang('App.invalid_data')];
+        }
+
+        $paymentStatus = $paidAmount >= $totalAmount ? 'paid' : 'partial';
+        $newStatus = $booking->status;
+        if ($paymentStatus === 'paid' && $booking->status !== 'paid') {
+            $newStatus = 'paid';
+        }
+
+        try {
+            $this->stateMachine->assertTransition($oldStatus, $newStatus);
+        } catch (\InvalidArgumentException) {
+            $db->transRollback();
+            return ['success' => false, 'message' => lang('App.invalid_data')];
+        }
 
         $this->bookingModel->update($bookingId, [
             'paid_amount'    => $paidAmount,
@@ -272,94 +310,99 @@ class BookingService
             'updated_by'     => $userId,
         ]);
 
-        // Log
         $this->bookingLogModel->addLog(
-            $booking->tenant_id, $bookingId,
-            'payment_confirmed',
+            $booking->tenant_id, $bookingId, 'payment_confirmed',
             $oldStatus, $newStatus,
-            lang('App.payment_confirmed_amount', [$amount]),
-            $userId
+            lang('App.payment_confirmed_amount', [$amount]), $userId
         );
 
-        // If fully paid, update payment status log
         if ($paymentStatus === 'paid' && $oldPaymentStatus !== 'paid') {
             $this->bookingLogModel->addLog(
-                $booking->tenant_id, $bookingId,
-                'payment_status_changed',
-                $oldPaymentStatus, 'paid',
-                lang('App.fully_paid'),
-                $userId
+                $booking->tenant_id, $bookingId, 'payment_status_changed',
+                $oldPaymentStatus, 'paid', lang('App.fully_paid'), $userId
             );
+        }
+
+        $db->transComplete();
+        if ($db->transStatus() === false) {
+            return ['success' => false, 'message' => lang('App.invalid_data')];
         }
 
         return [
             'success' => true,
             'message' => lang('App.payment_confirmed'),
-            'booking' => $this->bookingModel->find($bookingId),
+            'booking' => $this->findBookingForContext($bookingId, $tenantId),
         ];
     }
 
     /**
      * Cancel a booking
      */
-    public function cancelBooking(int $bookingId, ?string $reason = null, ?int $userId = null): array
+    public function cancelBooking(int $bookingId, ?string $reason = null, ?int $userId = null, ?int $tenantId = null): array
     {
-        $booking = $this->bookingModel->find($bookingId);
-        if (!$booking) {
+        $db = \Config\Database::connect();
+        $db->transStart();
+        $booking = $this->findBookingForContext($bookingId, $tenantId, true);
+        if (! $booking) {
+            $db->transRollback();
             return ['success' => false, 'message' => lang('App.booking_not_found')];
         }
 
-        if (in_array($booking->status, ['completed', 'cancelled', 'refunded'])) {
+        $oldStatus = $booking->status;
+        $newStatus = (float) $booking->paid_amount > 0 ? 'refunded' : 'cancelled';
+        try {
+            $this->stateMachine->assertTransition($oldStatus, $newStatus);
+        } catch (\InvalidArgumentException) {
+            $db->transRollback();
             return ['success' => false, 'message' => lang('App.cannot_cancel_booking')];
         }
 
-        $oldStatus = $booking->status;
-        $newStatus = $booking->paid_amount > 0 ? 'refunded' : 'cancelled';
-
         $this->bookingModel->update($bookingId, [
-            'status'          => $newStatus,
-            'payment_status'  => $booking->paid_amount > 0 ? 'refunded' : 'unpaid',
-            'cancelled_at'    => date('Y-m-d H:i:s'),
+            'status'           => $newStatus,
+            'payment_status'   => $newStatus === 'refunded' ? 'refunded' : 'unpaid',
+            'cancelled_at'     => date('Y-m-d H:i:s'),
             'cancelled_reason' => $reason,
-            'updated_by'      => $userId,
+            'is_hold'          => 0,
+            'updated_by'       => $userId,
         ]);
-
-        // Cancel all active items
         $this->bookingItemModel->where('booking_id', $bookingId)
-                               ->where('status', 'active')
-                               ->set(['status' => 'cancelled', 'updated_at' => date('Y-m-d H:i:s')])
-                               ->update();
-
-        // Revoke QR codes
+            ->where('status', 'active')
+            ->set(['status' => 'cancelled', 'updated_at' => date('Y-m-d H:i:s')])
+            ->update();
         $this->bookingQrCodeModel->invalidateByBooking($bookingId);
-
-        // Log
         $this->bookingLogModel->addLog(
             $booking->tenant_id, $bookingId,
             $newStatus === 'refunded' ? 'refunded' : 'cancelled',
-            $oldStatus, $newStatus,
-            $reason ?? lang('App.booking_cancelled'),
-            $userId
+            $oldStatus, $newStatus, $reason ?? lang('App.booking_cancelled'), $userId
         );
+
+        $db->transComplete();
+        if ($db->transStatus() === false) {
+            return ['success' => false, 'message' => lang('App.cannot_cancel_booking')];
+        }
 
         return [
             'success' => true,
             'message' => lang('App.booking_cancelled_success'),
-            'booking' => $this->bookingModel->find($bookingId),
+            'booking' => $this->findBookingForContext($bookingId, $tenantId),
         ];
     }
 
     /**
      * Reschedule a booking
      */
-    public function rescheduleBooking(int $bookingId, array $newData, ?int $userId = null): array
+    public function rescheduleBooking(int $bookingId, array $newData, ?int $userId = null, ?int $tenantId = null): array
     {
-        $booking = $this->bookingModel->find($bookingId);
-        if (!$booking) {
+        $db = \Config\Database::connect();
+        $db->transStart();
+        $booking = $this->findBookingForContext($bookingId, $tenantId, true);
+        if (! $booking) {
+            $db->transRollback();
             return ['success' => false, 'message' => lang('App.booking_not_found')];
         }
 
         if (in_array($booking->status, ['completed', 'cancelled', 'refunded', 'no_show'])) {
+            $db->transRollback();
             return ['success' => false, 'message' => lang('App.cannot_reschedule_booking')];
         }
 
@@ -367,11 +410,14 @@ class BookingService
         $newStartTime = $newData['start_time'] ?? $booking->start_time;
         $newEndTime = $newData['end_time'] ?? $booking->end_time;
 
-        // Check availability for all courts in booking items
+        // Lock the courts before checking availability so two reschedules
+        // cannot reserve the same interval concurrently.
         $items = $this->bookingItemModel->getByBooking($bookingId);
         foreach ($items as $item) {
+            $db->query('SELECT id FROM courts WHERE id = ? FOR UPDATE', [(int) $item->court_id]);
             if (!$this->checkCourtAvailable($item->court_id, $newDate, $newStartTime, $newEndTime, $bookingId)) {
                 $court = $this->courtModel->find($item->court_id);
+                $db->transRollback();
                 return [
                     'success' => false,
                     'message' => lang('App.court_not_available', [$court ? $court->code : $item->court_id]),
@@ -419,97 +465,173 @@ class BookingService
             $userId
         );
 
+        $db->transComplete();
+        if ($db->transStatus() === false) {
+            return ['success' => false, 'message' => lang('App.cannot_reschedule_booking')];
+        }
+
         return [
             'success' => true,
             'message' => lang('App.booking_rescheduled_success'),
-            'booking' => $this->bookingModel->find($bookingId),
+            'booking' => $this->findBookingForContext($bookingId, $tenantId),
         ];
     }
 
     /**
      * Check-in using QR token
      */
-    public function checkInByQr(string $token, ?int $userId = null): array
+    public function checkInByQr(string $token, ?int $userId = null, ?int $tenantId = null): array
     {
-        $qrCode = $this->bookingQrCodeModel->findActiveByToken($token);
-        if (!$qrCode) {
+        $db = \Config\Database::connect();
+        $db->transStart();
+
+        // Claim the active QR row under a lock. A second concurrent scan will
+        // observe the used status after the first transaction commits.
+        $qrSql = 'SELECT * FROM booking_qr_codes WHERE qr_token = ? AND status = ?';
+        $qrParams = [$token, 'active'];
+        if ($tenantId !== null) {
+            $qrSql .= ' AND tenant_id = ?';
+            $qrParams[] = $tenantId;
+        }
+        $qrSql .= ' LIMIT 1 FOR UPDATE';
+        $qrCode = $db->query($qrSql, $qrParams)->getRow();
+        if (! $qrCode) {
+            $db->transRollback();
             return ['success' => false, 'message' => lang('App.qr_invalid_or_expired')];
         }
 
         if ($qrCode->expired_at && strtotime($qrCode->expired_at) < time()) {
-            $this->bookingQrCodeModel->update($qrCode->id, ['status' => 'expired']);
+            $db->table('booking_qr_codes')->where('id', $qrCode->id)->update(['status' => 'expired']);
+            $db->transComplete();
             return ['success' => false, 'message' => lang('App.qr_expired')];
         }
 
-        $booking = $this->bookingModel->find($qrCode->booking_id);
-        if (!$booking) {
+        $booking = $this->findBookingForContext((int) $qrCode->booking_id, $tenantId, true);
+        if (! $booking) {
+            $db->transRollback();
             return ['success' => false, 'message' => lang('App.booking_not_found')];
         }
 
         if ($booking->status === 'checked_in') {
+            $db->transRollback();
             return ['success' => true, 'message' => lang('App.already_checked_in'), 'booking' => $booking];
         }
 
-        if (!in_array($booking->status, ['reserved', 'paid'])) {
+        try {
+            $this->stateMachine->assertTransition($booking->status, 'checked_in');
+        } catch (\InvalidArgumentException) {
+            $db->transRollback();
             return ['success' => false, 'message' => lang('App.cannot_check_in_status')];
         }
 
-        $oldStatus = $booking->status;
-
-        $db = \Config\Database::connect();
-        $db->transStart();
-
-        $this->bookingModel->update($bookingId = $booking->id, [
-            'status'        => 'checked_in',
-            'checked_in_at' => date('Y-m-d H:i:s'),
-            'updated_by'    => $userId,
+        $bookingId = (int) $booking->id;
+        $now = date('Y-m-d H:i:s');
+        $this->bookingModel->update($bookingId, [
+            'status' => 'checked_in', 'checked_in_at' => $now, 'updated_by' => $userId,
         ]);
+        $claimed = $db->table('booking_qr_codes')
+            ->where('id', $qrCode->id)
+            ->where('status', 'active')
+            ->update(['status' => 'used', 'used_at' => $now]);
+        if ($claimed !== true || $db->affectedRows() < 1) {
+            $db->transRollback();
+            return ['success' => false, 'message' => lang('App.qr_invalid_or_expired')];
+        }
 
-        // Mark QR as used
-        $this->bookingQrCodeModel->update($qrCode->id, [
-            'status'  => 'used',
-            'used_at' => date('Y-m-d H:i:s'),
-        ]);
-
-        // Log
         $this->bookingLogModel->addLog(
-            $booking->tenant_id, $bookingId,
-            'checked_in',
-            $oldStatus, 'checked_in',
-            lang('App.checked_in_via_qr'),
-            $userId
+            $booking->tenant_id, $bookingId, 'checked_in', $booking->status,
+            'checked_in', lang('App.checked_in_via_qr'), $userId
         );
-
         $db->transComplete();
-
         if ($db->transStatus() === false) {
             return ['success' => false, 'message' => lang('App.check_in_failed')];
         }
 
-        // Optionally update court status to occupied
+        $this->occupyCourts($bookingId);
+        return [
+            'success' => true,
+            'message' => lang('App.check_in_success'),
+            'booking' => $this->findBookingForContext($bookingId, $tenantId),
+        ];
+    }
+
+    /**
+     * Manual/admin check-in uses the same lifecycle rules as QR check-in.
+     */
+    public function checkIn(int $bookingId, ?int $userId = null, ?int $tenantId = null): array
+    {
+        $db = \Config\Database::connect();
+        $db->transStart();
+        $booking = $this->findBookingForContext($bookingId, $tenantId, true);
+        if (! $booking) {
+            $db->transRollback();
+            return ['success' => false, 'message' => lang('App.booking_not_found')];
+        }
+        if ($booking->status === 'checked_in') {
+            $db->transRollback();
+            return ['success' => true, 'message' => lang('App.already_checked_in'), 'booking' => $booking];
+        }
+        try {
+            $this->stateMachine->assertTransition($booking->status, 'checked_in');
+        } catch (\InvalidArgumentException) {
+            $db->transRollback();
+            return ['success' => false, 'message' => lang('App.cannot_check_in_status')];
+        }
+        $this->bookingModel->update($bookingId, [
+            'status' => 'checked_in', 'checked_in_at' => date('Y-m-d H:i:s'), 'updated_by' => $userId,
+        ]);
+        $this->bookingLogModel->addLog(
+            $booking->tenant_id, $bookingId, 'checked_in', $booking->status,
+            'checked_in', lang('App.checked_in_via_admin'), $userId
+        );
+        $db->transComplete();
+        if ($db->transStatus() === false) {
+            return ['success' => false, 'message' => lang('App.check_in_failed')];
+        }
+        $this->occupyCourts($bookingId);
+        return [
+            'success' => true,
+            'message' => lang('App.check_in_success'),
+            'booking' => $this->findBookingForContext($bookingId, $tenantId),
+        ];
+    }
+
+    protected function occupyCourts(int $bookingId): void
+    {
         $items = $this->bookingItemModel->getByBooking($bookingId);
         foreach ($items as $item) {
             $this->courtModel->update($item->court_id, ['status' => 'occupied']);
         }
+    }
 
-        return [
-            'success' => true,
-            'message' => lang('App.check_in_success'),
-            'booking' => $this->bookingModel->find($bookingId),
-        ];
+    protected function findBookingForContext(int $bookingId, ?int $tenantId = null, bool $forUpdate = false)
+    {
+        if ($forUpdate) {
+            return $this->bookingModel->findForUpdate($bookingId, $tenantId);
+        }
+
+        return $tenantId === null
+            ? $this->bookingModel->find($bookingId)
+            : $this->bookingModel->findForTenant($bookingId, $tenantId);
     }
 
     /**
      * Mark booking as completed
      */
-    public function markCompleted(int $bookingId, ?int $userId = null): array
+    public function markCompleted(int $bookingId, ?int $userId = null, ?int $tenantId = null): array
     {
-        $booking = $this->bookingModel->find($bookingId);
-        if (!$booking) {
+        $db = \Config\Database::connect();
+        $db->transStart();
+        $booking = $this->findBookingForContext($bookingId, $tenantId, true);
+        if (! $booking) {
+            $db->transRollback();
             return ['success' => false, 'message' => lang('App.booking_not_found')];
         }
 
-        if ($booking->status !== 'checked_in') {
+        try {
+            $this->stateMachine->assertTransition($booking->status, 'completed');
+        } catch (\InvalidArgumentException) {
+            $db->transRollback();
             return ['success' => false, 'message' => lang('App.cannot_complete_booking')];
         }
 
@@ -536,10 +658,15 @@ class BookingService
             $userId
         );
 
+        $db->transComplete();
+        if ($db->transStatus() === false) {
+            return ['success' => false, 'message' => lang('App.cannot_complete_booking')];
+        }
+
         return [
             'success' => true,
             'message' => lang('App.booking_completed_success'),
-            'booking' => $this->bookingModel->find($bookingId),
+            'booking' => $this->findBookingForContext($bookingId, $tenantId),
         ];
     }
 
@@ -554,6 +681,18 @@ class BookingService
         foreach ($expiredBookings as $booking) {
             $db = \Config\Database::connect();
             $db->transStart();
+
+            $lockedBooking = $this->bookingModel->findForUpdate((int) $booking->id, (int) $booking->tenant_id);
+            if (! $lockedBooking || ! in_array($lockedBooking->status, ['pending', 'hold'], true)) {
+                $db->transRollback();
+                continue;
+            }
+            try {
+                $this->stateMachine->assertTransition($lockedBooking->status, 'expired');
+            } catch (\InvalidArgumentException) {
+                $db->transRollback();
+                continue;
+            }
 
             $this->bookingModel->update($booking->id, [
                 'status'          => 'expired',
@@ -570,7 +709,7 @@ class BookingService
             $this->bookingLogModel->addLog(
                 $booking->tenant_id, $booking->id,
                 'auto_cancelled',
-                $booking->status, 'expired',
+                $lockedBooking->status, 'expired',
                 lang('App.auto_cancelled_expired'),
                 null
             );
@@ -597,11 +736,15 @@ class BookingService
         return $this->bookingModel->isCourtAvailable($courtId, $date, $startTime, $endTime, $excludeBookingId);
     }
 
-    protected function validateCourtBookable(int $courtId, int $branchId, string $date, string $startTime, string $endTime): array
+    protected function validateCourtBookable(int $courtId, int $tenantId, int $branchId, string $date, string $startTime, string $endTime): array
     {
         $court = $this->courtModel->find($courtId);
         if (! $court) {
             return ['success' => false, 'message' => 'Không tìm thấy sân.'];
+        }
+
+        if ((int) $court->tenant_id !== $tenantId) {
+            return ['success' => false, 'message' => 'Sân không thuộc tenant hiện tại.'];
         }
 
         if ((int) $court->branch_id !== $branchId) {
@@ -696,13 +839,21 @@ class BookingService
         return (int) (($end - $start) / 60);
     }
 
+    protected function isValidTimeRange(string $startTime, string $endTime): bool
+    {
+        $start = strtotime($startTime);
+        $end = strtotime($endTime);
+
+        return $start !== false && $end !== false && $end > $start;
+    }
+
     /**
      * Get available time slots for a court on a date
      */
-    public function getAvailableSlots(int $courtId, string $date, int $slotDurationMinutes = 60): array
+    public function getAvailableSlots(int $courtId, string $date, int $slotDurationMinutes = 60, ?int $tenantId = null): array
     {
         $court = $this->courtModel->find($courtId);
-        if (!$court || $court->status === 'inactive') {
+        if (!$court || $court->status === 'inactive' || ($tenantId !== null && (int) $court->tenant_id !== $tenantId)) {
             return [];
         }
 
@@ -748,7 +899,10 @@ class BookingService
             ->where('booking_items.court_id', $courtId)
             ->where('bookings.booking_date', $date)
             ->where('bookings.deleted_at', null)
-            ->where('bookings.status !=', 'cancelled')
+            ->whereIn('bookings.status', [
+                'draft', 'pending', 'hold', 'reserved',
+                'paid', 'checked_in', 'in_progress',
+            ])
             ->where('booking_items.status', 'active')
             ->findAll();
 

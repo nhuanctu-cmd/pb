@@ -28,7 +28,7 @@ class Payment extends Entity
         'invoice_id' => 'integer',
         'payment_code' => 'string',
         'method' => 'string',
-        'amount' => 'decimal',
+        'amount' => 'float',
         'transaction_ref' => 'string',
         'status' => 'string',
         'idempotency_key' => 'string',

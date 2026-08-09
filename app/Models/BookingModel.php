@@ -80,10 +80,14 @@ class BookingModel extends Model
     /**
      * Get bookings by branch with optional filters
      */
-    public function getByBranch(int $branchId, array $filters = [])
+    public function getByBranch(int $branchId, array $filters = [], ?int $tenantId = null)
     {
         $builder = $this->where('bookings.branch_id', $branchId)
                         ->where('bookings.deleted_at', null);
+
+        if ($tenantId !== null) {
+            $builder->where('bookings.tenant_id', $tenantId);
+        }
 
         if (!empty($filters['status'])) {
             $builder->where('bookings.status', $filters['status']);
@@ -116,12 +120,51 @@ class BookingModel extends Model
     }
 
     /**
+     * Find a booking inside an explicit tenant boundary.
+     *
+     * Controllers and services should use this method whenever the tenant is
+     * known. The fallback to find() must remain an intentional internal-only
+     * operation, never an authorization check.
+     */
+    public function findForTenant(int $bookingId, int $tenantId): ?\App\Entities\Booking
+    {
+        return $this->where('bookings.id', $bookingId)
+                    ->where('bookings.tenant_id', $tenantId)
+                    ->where('bookings.deleted_at', null)
+                    ->first();
+    }
+
+    /**
+     * Lock one booking row for a transactional state change.
+     */
+    public function findForUpdate(int $bookingId, ?int $tenantId = null): ?\App\Entities\Booking
+    {
+        $sql = 'SELECT * FROM bookings WHERE id = ? AND deleted_at IS NULL';
+        $params = [$bookingId];
+        if ($tenantId !== null) {
+            $sql .= ' AND tenant_id = ?';
+            $params[] = $tenantId;
+        }
+        $sql .= ' LIMIT 1 FOR UPDATE';
+        $row = $this->db->query($sql, $params)->getRowArray();
+        if (! $row) {
+            return null;
+        }
+
+        return new \App\Entities\Booking($row);
+    }
+
+    /**
      * Get bookings by player (user)
      */
-    public function getByPlayer(int $playerId, array $filters = [])
+    public function getByPlayer(int $playerId, array $filters = [], ?int $tenantId = null)
     {
         $builder = $this->where('bookings.player_id', $playerId)
                         ->where('bookings.deleted_at', null);
+
+        if ($tenantId !== null) {
+            $builder->where('bookings.tenant_id', $tenantId);
+        }
 
         if (!empty($filters['status'])) {
             $builder->where('bookings.status', $filters['status']);
@@ -136,20 +179,28 @@ class BookingModel extends Model
     /**
      * Get calendar events for a date range
      */
-    public function getCalendarEvents(int $branchId, string $dateFrom, string $dateTo)
+    public function getCalendarEvents(int $branchId, string $dateFrom, string $dateTo, ?int $tenantId = null)
     {
-        return $this->select('bookings.*, GROUP_CONCAT(CONCAT(booking_items.court_id, \':\', courts.code) SEPARATOR \', \') as court_info')
+        $builder = $this->select('bookings.*, GROUP_CONCAT(CONCAT(booking_items.court_id, \':\', courts.code) SEPARATOR \', \') as court_info')
                     ->join('booking_items', 'booking_items.booking_id = bookings.id', 'left')
                     ->join('courts', 'courts.id = booking_items.court_id', 'left')
                     ->where('bookings.branch_id', $branchId)
                     ->where('bookings.deleted_at', null)
                     ->where('bookings.booking_date >=', $dateFrom)
                     ->where('bookings.booking_date <=', $dateTo)
-                    ->where('bookings.status !=', 'cancelled')
+                    ->whereIn('bookings.status', [
+                        'draft', 'pending', 'hold', 'reserved',
+                        'paid', 'checked_in', 'in_progress',
+                    ])
                     ->groupBy('bookings.id')
                     ->orderBy('bookings.booking_date', 'ASC')
-                    ->orderBy('bookings.start_time', 'ASC')
-                    ->findAll();
+                    ->orderBy('bookings.start_time', 'ASC');
+
+        if ($tenantId !== null) {
+            $builder->where('bookings.tenant_id', $tenantId);
+        }
+
+        return $builder->findAll();
     }
 
     /**
@@ -172,6 +223,7 @@ class BookingModel extends Model
     {
         $now = date('Y-m-d H:i:s');
         return $this->groupStart()
+                    ->groupStart()
                         ->where('bookings.status', 'pending')
                         ->where('bookings.expires_at IS NOT NULL')
                         ->where('bookings.expires_at <=', $now)
@@ -180,6 +232,7 @@ class BookingModel extends Model
                         ->where('bookings.status', 'hold')
                         ->where('bookings.auto_release_at IS NOT NULL')
                         ->where('bookings.auto_release_at <=', $now)
+                    ->groupEnd()
                     ->groupEnd()
                     ->where('bookings.deleted_at', null)
                     ->findAll();
@@ -218,7 +271,10 @@ class BookingModel extends Model
                            ->where('booking_items.court_id', $courtId)
                            ->where('bookings.booking_date', $date)
                            ->where('bookings.deleted_at', null)
-                           ->where('bookings.status !=', 'cancelled')
+                           ->whereIn('bookings.status', [
+                               'draft', 'pending', 'hold', 'reserved',
+                               'paid', 'checked_in', 'in_progress',
+                           ])
                            ->where('booking_items.status', 'active')
                            ->groupStart()
                            ->where('booking_items.start_time <', $endTime)

@@ -33,8 +33,11 @@ class BranchOpeningHourModel extends Model
         'tenant_id'   => 'required|integer',
         'branch_id'   => 'required|integer',
         'day_of_week' => 'required|integer|greater_than_equal_to[0]|less_than[7]',
-        'open_time'   => 'permit_empty|valid_date[format:H:i:s]',
-        'close_time'  => 'permit_empty|valid_date[format:H:i:s]',
+        // valid_date() is for calendar dates and rejects valid MySQL TIME
+        // values such as 07:00:00. Keep the boundary strict with a time
+        // expression instead.
+        'open_time'   => 'permit_empty|regex_match[/^(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$/]',
+        'close_time'  => 'permit_empty|regex_match[/^(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$/]',
     ];
     protected $validationMessages   = [];
     protected $skipValidation       = false;

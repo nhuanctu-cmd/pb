@@ -1,5 +1,7 @@
 # 🏓 Pickleball SaaS Platform - Enterprise Architecture
 
+> **Implementation note:** Repository này đang chạy thực tế trên **CodeIgniter 4.7 + PHP 8.2 + MySQL 8 + Bootstrap 5**. Các đoạn tham chiếu Laravel trong tài liệu bên dưới là thiết kế ý tưởng cũ và không phải chỉ dẫn để đổi framework. Khi triển khai, luôn ưu tiên `app/Config`, `app/Controllers`, `app/Services`, `app/Models`, `app/Filters` và migration của CodeIgniter hiện có.
+
 > **Version:** 2.0.0
 > **Status:** Architecture Design Document
 > **Last Updated:** 2026-07-06

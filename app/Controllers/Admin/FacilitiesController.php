@@ -24,7 +24,7 @@ class FacilitiesController extends BaseController
     {
         $tenantId = current_tenant_id();
 
-        $this->viewData['pageTitle'] = 'Facilities';
+        $this->viewData['pageTitle'] = lang('App.menu_facilities');
         $this->viewData['filters'] = $this->request->getGet();
         $this->viewData['facilities'] = $tenantId
             ? $this->facilityModel->getByTenant($tenantId, $this->request->getGet())
@@ -35,7 +35,7 @@ class FacilitiesController extends BaseController
 
     public function create()
     {
-        $this->viewData['pageTitle'] = 'Create Facility';
+        $this->viewData['pageTitle'] = lang('App.facility_create');
         return $this->render('admin/facilities/form', $this->viewData);
     }
 
@@ -43,7 +43,7 @@ class FacilitiesController extends BaseController
     {
         $tenantId = current_tenant_id();
         if (!$tenantId) {
-            return redirect()->to('/admin/tenants/select')->with('warning', 'Please select a tenant first.');
+            return redirect()->to('/admin/tenants/select')->with('warning', lang('App.forbidden'));
         }
 
         $rules = [
@@ -69,7 +69,7 @@ class FacilitiesController extends BaseController
             'created_by'     => user_id(),
         ]);
 
-        return redirect()->to('/admin/facilities')->with('success', 'Facility created successfully.');
+        return redirect()->to('/admin/facilities')->with('success', lang('App.created_success'));
     }
 
     public function edit(int $id)
@@ -79,7 +79,7 @@ class FacilitiesController extends BaseController
             return redirect()->to('/admin/facilities')->with('error', lang('App.no_data'));
         }
 
-        $this->viewData['pageTitle'] = 'Edit Facility';
+        $this->viewData['pageTitle'] = lang('App.facility_edit');
         $this->viewData['facility'] = $facility;
 
         return $this->render('admin/facilities/form', $this->viewData);
@@ -114,13 +114,13 @@ class FacilitiesController extends BaseController
             'updated_by' => user_id(),
         ]);
 
-        return redirect()->to('/admin/facilities')->with('success', 'Facility updated successfully.');
+        return redirect()->to('/admin/facilities')->with('success', lang('App.updated_success'));
     }
 
     public function delete(int $id)
     {
         $this->facilityModel->delete($id);
-        return redirect()->to('/admin/facilities')->with('success', 'Facility deleted successfully.');
+        return redirect()->to('/admin/facilities')->with('success', lang('App.deleted_success'));
     }
 
     public function dashboard(int $id)
@@ -183,6 +183,6 @@ class FacilitiesController extends BaseController
     public function toggleDevice(int $deviceId)
     {
         $this->facilityService->toggleDevice($deviceId);
-        return redirect()->back()->with('success', 'Device updated successfully.');
+        return redirect()->back()->with('success', lang('App.updated_success'));
     }
 }

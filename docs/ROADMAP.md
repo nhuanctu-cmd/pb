@@ -51,7 +51,7 @@
 | M0 | Hạ tầng chạy (env/migrate/seed/git) | ✅ **HOÀN THÀNH** (09/08/2026) |
 | M1 | Core: Tenant + Auth + RBAC + SaaS Plan | ✅ **HOÀN THÀNH** (09/08/2026) |
 | M2 | Common: Settings + Media + Audit + Notification Engine | ✅ **HOÀN THÀNH** (09/08/2026) |
-| M3 | Facility (cụm sân/chi nhánh/sân/giá) | ⬜ |
+| M3 | Facility (cụm sân/chi nhánh/sân/giá) | ✅ **HOÀN THÀNH** (09/08/2026) |
 | M4 | Booking hoàn chỉnh | ⬜ |
 | M5 | Payment & Ví | ⬜ |
 | M6 | Membership | ⬜ |
@@ -102,9 +102,13 @@
 - Media library: upload ảnh tự resize ≤1600px + thumbnail 300px, lọc theo loại, copy URL, soft delete; storage `public/uploads/YYYY/MM/`
 - 19 test mới (Notification/Setting/Media/Job) → tổng 76 tests, 238 assertions OK
 
-### M3 — Facility
-- Hoàn thiện CRUD cụm sân/chi nhánh/sân/loại sân/giờ mở cửa/ngày nghỉ/bảo trì/thiết bị
-- UI VN chuẩn 4 mẫu; lưới sân realtime (grid + timeline)
+### M3 — Facility ✅
+- **Branch CRUD hoàn chỉnh**: danh sách (kèm số sân), form tạo/sửa, xóa mềm (chặn xóa khi còn sân), tự seed 7 ngày giờ mở cửa mặc định khi tạo
+- **Giờ mở cửa theo tuần**: trang chỉnh 7 ngày (giờ mở/đóng/nghỉ), upsert theo day_of_week
+- **Ngày nghỉ/lễ**: thêm/xóa ngày nghỉ theo chi nhánh
+- **Facility**: CRUD cụm sân + dashboard tổng quan (đã có sẵn, localize tiếng Việt)
+- **Courts**: lưới sân + timeline + bảo trì + ảnh (đã có sẵn)
+- 10 test mới (Branch CRUD/giờ mở cửa/chặn xóa) → tổng 86 tests, 255 assertions OK
 
 ### M4 — Booking ⭐
 - Chống trùng lịch (transaction + row lock), QR check-in, reschedule
@@ -142,3 +146,259 @@
 - Chạy dev: `php spark serve --port 8080` → http://localhost:8080
 - Chạy lại từ đầu: drop DB → `php spark migrate --all` → `php spark db:seed CoreSeeder` (+ các seeder demo)
 - 6 migration cũ nằm trong thư mục con `app/Database/Migrations/2026-*/` — schema gốc đã apply qua `app/Database/SQL/create_all_tables.sql` (sẽ chuẩn hóa ở M1)
+
+---
+
+## 5. Roadmap theo cụm chức năng nghiệp vụ
+
+Roadmap này dùng để chia việc theo giá trị vận hành. Một cụm chỉ được xem là hoàn thành khi có đủ migration, Model/Entity, Service, Controller/API, view, permission/menu, seeder và test luồng chính.
+
+### Cụm A — Nền tảng và phân quyền
+
+**Mục tiêu:** Một tài khoản đăng nhập an toàn, làm việc đúng tenant/chi nhánh và chỉ thấy đúng menu/chức năng.
+
+**Đã có:** Tenant, Auth, RBAC, session tracking, password reset, SaaS plan, tenant switch, audit log cơ bản.
+
+**Nên hoàn thiện tiếp:**
+
+- Tenant membership: một user có thể thuộc nhiều tenant/branch.
+- Tenant context filter cho mọi thao tác đọc/ghi nghiệp vụ.
+- Phân quyền tách `view/create/update/delete/approve/refund/checkin`.
+- CSRF cho toàn bộ form POST và đổi các thao tác xóa từ GET sang POST.
+- Security header, rate limit API, log request ID.
+
+**Phụ thuộc:** không có. Đây là cụm nền bắt buộc trước các nghiệp vụ tiền và booking.
+
+### Cụm B — Cấu hình cơ sở kinh doanh
+
+**Mục tiêu:** Chủ sân tạo được mô hình `Cụm sân → Chi nhánh → Sân` và vận hành được lịch mở cửa.
+
+**Chức năng:**
+
+- Facility/branch/court CRUD.
+- Loại sân, indoor/outdoor, mặt sân, tiện ích, hình ảnh.
+- Giờ mở cửa theo thứ, ngày lễ/ngày nghỉ.
+- Trạng thái sân: hoạt động, đang chơi, giữ chỗ, bảo trì, khóa, đóng cửa.
+- Lịch bảo trì, block sân, thiết bị sân và session vận hành.
+- Grid/timeline/calendar theo từng sân.
+
+**Nên hoàn thiện tiếp:** kiểm tra tenant khi sửa/xóa theo ID, form validation inline, không cho xóa sân có dữ liệu lịch sử, menu active đúng route.
+
+**Phụ thuộc:** Cụm A.
+
+### Cụm C — Booking và Availability Core ⭐
+
+**Mục tiêu:** Đặt sân chính xác, không double-booking và có thể kiểm soát hold/payment.
+
+**Chức năng:**
+
+- Tìm sân trống theo chi nhánh/ngày/giờ/thời lượng.
+- Availability tính từ lịch mở cửa, ngày nghỉ, booking, hold, bảo trì, block và event.
+- Tạo booking nhiều sân, cập nhật giá snapshot.
+- Hold 5 phút, tự hết hạn, giải phóng item.
+- State machine: `draft → hold → pending_payment → reserved/paid → checked_in → completed`; nhánh `expired/cancelled/refunded/no_show`.
+- Reschedule, cancel theo chính sách, no-show.
+- QR booking và QR check-in dùng một lần.
+- Booking admin, player portal và API dùng chung Service.
+
+**Đã nâng cấp bước đầu:** transaction + row lock ở court, hold timeout và expired release.
+
+**Cần viết test bắt buộc:** overlap, concurrent booking, hold expiry, reschedule conflict, cross-tenant access, QR replay, cancel/refund.
+
+**Phụ thuộc:** Cụm A + B.
+
+### Cụm D — Giá, thanh toán và tài chính
+
+**Mục tiêu:** Giá và tiền minh bạch, truy vết được, không mất giao dịch.
+
+**Chức năng:**
+
+- Base price, peak/off-peak, cuối tuần, ngày lễ, giá theo loại sân.
+- Dynamic pricing và price breakdown snapshot tại booking.
+- Deposit/full payment/split payment.
+- Invoice, payment, refund, VietQR/bank transfer.
+- Payment provider abstraction cho VNPay/MoMo/Stripe về sau.
+- Webhook signature, idempotency key, duplicate callback protection.
+- Wallet ledger: top-up, payment, refund, credit, adjustment.
+
+**Nguyên tắc:** Không update trực tiếp số dư ví; mọi thay đổi phải có ledger transaction.
+
+**Phụ thuộc:** Cụm C; dùng lại `PricingService`, `PaymentService`, invoice/payment/refund models hiện có.
+
+### Cụm E — Khách hàng, Player và Membership
+
+**Mục tiêu:** Quản lý khách và tăng tỷ lệ quay lại sân.
+
+**Chức năng:**
+
+- Player profile, level/rating, lịch sử chơi, tỷ lệ hủy/no-show.
+- Membership package, quyền lợi, booking window, discount, free hours.
+- Gia hạn/hết hạn membership và usage tracking.
+- Check-in khách, ghi chú chăm sóc, blacklist theo policy.
+- Review sân sau booking hoàn tất.
+
+**Phụ thuộc:** Cụm A + C + D.
+
+### Cụm F — Vận hành tại quầy và doanh thu
+
+**Mục tiêu:** Nhân viên có một màn hình để xử lý vận hành hằng ngày.
+
+**Chức năng:**
+
+- Walk-in booking cho user hoặc guest.
+- Staff check-in, scan QR, đổi sân, block sân nhanh.
+- POS bán nước, bóng, vợt, khăn, merchandise.
+- Kho, nhập/xuất/kiểm kê, ca làm việc và két tiền.
+- Dashboard hôm nay: booking, sân đang chơi, hold sắp hết hạn, doanh thu, no-show.
+
+**Phụ thuộc:** Cụm B + C + D.
+
+### Cụm G — Open Play và cộng đồng Pickleball
+
+**Mục tiêu:** Người chơi mua slot tham gia và tìm người chơi phù hợp.
+
+**Chức năng:**
+
+- Open Play session, capacity, level range, price per player.
+- Join game, request/approve player, public/private/club-only.
+- Waitlist và tự động mời người tiếp theo khi có chỗ.
+- Matchmaking deterministic theo level, lịch, địa điểm và lịch sử partner/opponent.
+- Rotation engine, partner/opponent history, waiting time.
+- Club, team, follow/favorite, invitation link.
+
+**Phụ thuộc:** Cụm E + C + D.
+
+### Cụm H — Coach và Clinic
+
+**Mục tiêu:** Bán dịch vụ huấn luyện với availability của cả coach và court.
+
+**Chức năng:**
+
+- Coach profile, chứng chỉ, chuyên môn, giá giờ.
+- Coach availability, blackout và lịch nghỉ.
+- Private 1:1, semi-private, group lesson, clinic.
+- Capacity, waitlist, payment, attendance, review.
+
+**Phụ thuộc:** Cụm B + C + D + E.
+
+### Cụm I — Giải đấu và thi đấu
+
+**Mục tiêu:** Tổ chức giải từ đăng ký đến kết quả và bảng xếp hạng.
+
+**Đã có:** Tournament, registration, bracket, group, scheduler, referee scoring, live score.
+
+**Nên mở rộng:**
+
+- Round robin, ladder, league và standings.
+- Check-in đội/người chơi, seed, đổi lịch có kiểm soát.
+- Tách kết quả thi đấu khỏi trạng thái booking nhưng liên kết được court/time.
+- Audit thay đổi score/result và quyền referee.
+
+**Phụ thuộc:** Cụm B + E; thanh toán giải dùng Cụm D.
+
+### Cụm J — Thông báo, tài liệu và tích hợp
+
+**Mục tiêu:** Người dùng luôn biết trạng thái booking/payment và admin có dữ liệu kết nối.
+
+**Đã có:** Notification template vi/en, in-app bell, job queue đơn giản, media library.
+
+**Nên hoàn thiện:**
+
+- Booking confirmation/reminder/cancel/payment/waitlist notification.
+- Queue worker và retry/dead-letter rõ ràng.
+- Email/SMS/Push adapter.
+- Media permission theo tenant/branch, file type/size policy.
+- Webhook outbound cho đối tác.
+
+**Phụ thuộc:** Cụm A; tích hợp sâu theo từng cụm nghiệp vụ.
+
+### Cụm K — Báo cáo và dữ liệu quản trị
+
+**Mục tiêu:** Chủ sân ra quyết định dựa trên occupancy, doanh thu và hành vi khách.
+
+**Chức năng:**
+
+- Occupancy theo sân/giờ/ngày/chi nhánh.
+- Doanh thu booking/payment/POS/membership.
+- Peak hour, cancellation, no-show, repeat customer.
+- Court utilization ranking và forecast nhu cầu cơ bản.
+- Export CSV/Excel/PDF theo quyền.
+
+**Phụ thuộc:** Cụm B + C + D + F + E.
+
+### Cụm L — API, Mobile và mở rộng
+
+**Mục tiêu:** Dùng chung nghiệp vụ cho web, PWA, mobile và đối tác.
+
+**Chức năng:**
+
+- API versioning `/api/v1`.
+- Auth token/refresh rotation, scope permission, rate limit.
+- API availability, booking, payment status, player profile, notification.
+- OpenAPI document và contract test.
+- Polling trước; chỉ thêm realtime/WebSocket khi có nhu cầu vận hành rõ ràng.
+
+**Phụ thuộc:** Các cụm lõi đã ổn định và có feature test.
+
+## 6. Thứ tự triển khai đề xuất
+
+```text
+A Nền tảng/RBAC
+        ↓
+B Facility/Court/Schedule
+        ↓
+C Booking/Availability/Hold/QR
+        ↓
+D Pricing/Payment/Wallet
+        ↓
+E Player/Membership/Review
+        ↓
+F Walk-in/POS/Kho/Owner Dashboard
+        ↓
+G Open Play/Waitlist/Matchmaking
+        ↓
+H Coach/Clinic
+        ↓
+I Tournament/League/Ladder
+        ↓
+J Notification/Integration nâng cao
+        ↓
+K Reporting/Analytics
+        ↓
+L API/Mobile/Realtime mở rộng
+```
+
+## 7. Mốc nghiệm thu thương mại
+
+### MVP vận hành một cụm sân
+
+Hoàn tất A → F: chủ sân tạo sân, cấu hình lịch/giá, nhận booking, thu tiền, check-in, bán hàng và xem doanh thu.
+
+### Nền tảng Pickleball có cộng đồng
+
+Hoàn tất A → G: người chơi có profile, membership, open play, join game, waitlist và matchmaking.
+
+### Nền tảng SaaS mở rộng
+
+Hoàn tất A → L: nhiều tenant/chi nhánh, API mobile, tích hợp thanh toán/thông báo, báo cáo và realtime có kiểm soát.
+
+## 8. Quy tắc chọn việc tiếp theo
+
+1. Ưu tiên lỗi có thể làm sai tiền hoặc double-booking.
+2. Sau đó hoàn thiện màn hình vận hành hằng ngày.
+3. Mỗi cụm phải có test và menu trước khi chuyển cụm.
+4. Không mở Open Play/AI khi Booking Core chưa ổn định.
+5. Không thêm realtime nếu polling đáp ứng được vận hành hiện tại.
+
+## 9. Trạng thái hardening đã hoàn tất — Booking Core
+
+Đợt nâng cấp thương mại đầu tiên đã hoàn tất ở Cụm C:
+
+- Tenant isolation cho booking list/detail/cancel/reschedule/check-in và availability.
+- Booking state machine dùng chung cho web, player portal và API.
+- Transaction + row-lock cho create, payment, reschedule, completion, expiry và QR claim.
+- Chống double-book trong cùng request; snapshot giá và audit log tiếp tục nằm trong transaction.
+- API bearer token ký HMAC bằng encryption key; token bị sửa sẽ bị từ chối.
+- 86 test / 255 assertion đạt; test state machine, tamper token và branch regression đã được bổ sung.
+
+Việc tiếp theo theo thứ tự rủi ro: Payment Ledger + idempotency key, refund policy, rồi mới mở rộng waitlist/recurring booking.

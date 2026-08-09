@@ -26,6 +26,11 @@ class InvoiceService
      */
     public function createInvoice(int $tenantId, ?int $branchId, string $invoiceCode, float $totalAmount, array $data = []): Invoice
     {
+        $totalAmount = round($totalAmount, 2);
+        $discountAmount = round((float) ($data['discount_amount'] ?? 0), 2);
+        if ($tenantId <= 0 || $totalAmount < 0 || $discountAmount < 0 || $discountAmount > $totalAmount) {
+            throw new \InvalidArgumentException('Invalid invoice amount or tenant');
+        }
         $db = \Config\Database::connect();
         $db->transStart();
 
@@ -39,8 +44,8 @@ class InvoiceService
             $invoice->ref_type = $data['ref_type'] ?? null;
             $invoice->ref_id = $data['ref_id'] ?? null;
             $invoice->subtotal = $totalAmount;
-            $invoice->discount_amount = $data['discount_amount'] ?? 0;
-            $invoice->total_amount = $totalAmount - ($data['discount_amount'] ?? 0);
+            $invoice->discount_amount = $discountAmount;
+            $invoice->total_amount = round($totalAmount - $discountAmount, 2);
             $invoice->paid_amount = 0;
             $invoice->status = 'unpaid';
             $invoice->note = $data['note'] ?? null;
@@ -62,95 +67,31 @@ class InvoiceService
     /**
      * Add payment to invoice
      */
-    public function addPayment(int $invoiceId, float $amount, string $method, array $data = []): array
+    public function addPayment(int $invoiceId, float $amount, string $method, array $data = [], ?int $tenantId = null): array
     {
-        $db = \Config\Database::connect();
-        $db->transStart();
-
-        try {
-            $invoice = $this->invoiceModel->find($invoiceId);
-            if (!$invoice) {
-                throw new \InvalidArgumentException('Invoice not found');
-            }
-
-            if ($invoice['status'] === 'cancelled') {
-                throw new \InvalidArgumentException('Invoice is cancelled');
-            }
-
-            // Check idempotency
-            if (!empty($data['idempotency_key'])) {
-                $existingPayment = $this->paymentModel->findByIdempotencyKey($data['idempotency_key']);
-                if ($existingPayment) {
-                    throw new \InvalidArgumentException('Duplicate payment detected');
-                }
-            }
-
-            // Generate payment code
-            $paymentCode = $this->generatePaymentCode($invoice['tenant_id']);
-
-            // Create payment
-            $paymentData = [
-                'tenant_id' => $invoice['tenant_id'],
-                'invoice_id' => $invoiceId,
-                'payment_code' => $paymentCode,
-                'method' => $method,
-                'amount' => $amount,
-                'transaction_ref' => $data['transaction_ref'] ?? null,
-                'status' => 'success',
-                'idempotency_key' => $data['idempotency_key'] ?? null,
-                'paid_at' => date('Y-m-d H:i:s'),
-                'created_by' => $data['created_by'] ?? null,
-                'created_at' => date('Y-m-d H:i:s'),
-                'updated_at' => date('Y-m-d H:i:s'),
-            ];
-
-            $paymentId = $this->paymentModel->insert($paymentData);
-
-            // Update invoice
-            $newPaidAmount = $invoice['paid_amount'] + $amount;
-            $newStatus = $this->calculateInvoiceStatus($invoice['total_amount'], $newPaidAmount);
-
-            $this->invoiceModel->update($invoiceId, [
-                'paid_amount' => $newPaidAmount,
-                'status' => $newStatus,
-                'updated_at' => date('Y-m-d H:i:s'),
-            ]);
-
-            $db->transComplete();
-
-            return [
-                'success' => true,
-                'payment_id' => $paymentId,
-                'payment_code' => $paymentCode,
-                'new_paid_amount' => $newPaidAmount,
-                'new_status' => $newStatus,
-            ];
-        } catch (\Exception $e) {
-            $db->transRollback();
-            throw $e;
-        }
+        return (new PaymentService())->pay($invoiceId, $amount, $method, $data, $tenantId);
     }
 
     /**
      * Cancel invoice
      */
-    public function cancelInvoice(int $invoiceId, ?string $reason = null): bool
+    public function cancelInvoice(int $invoiceId, ?string $reason = null, ?int $tenantId = null): bool
     {
         $db = \Config\Database::connect();
         $db->transStart();
 
         try {
-            $invoice = $this->invoiceModel->find($invoiceId);
+            $invoice = $this->invoiceModel->findForUpdate($invoiceId, $tenantId);
             if (!$invoice) {
                 throw new \InvalidArgumentException('Invoice not found');
             }
 
-            if ($invoice['status'] === 'cancelled') {
+            if ($invoice->status === 'cancelled') {
                 throw new \InvalidArgumentException('Invoice already cancelled');
             }
 
             // If invoice is paid, need to refund first
-            if ($invoice['paid_amount'] > 0) {
+            if ($invoice->paid_amount > 0) {
                 throw new \InvalidArgumentException('Cannot cancel paid invoice. Please refund first.');
             }
 
@@ -171,14 +112,16 @@ class InvoiceService
     /**
      * Update invoice status
      */
-    public function updateStatus(int $invoiceId): string
+    public function updateStatus(int $invoiceId, ?int $tenantId = null): string
     {
-        $invoice = $this->invoiceModel->find($invoiceId);
+        $invoice = $tenantId === null
+            ? $this->invoiceModel->find($invoiceId)
+            : $this->invoiceModel->findForTenant($invoiceId, $tenantId);
         if (!$invoice) {
             throw new \InvalidArgumentException('Invoice not found');
         }
 
-        $newStatus = $this->calculateInvoiceStatus($invoice['total_amount'], $invoice['paid_amount']);
+        $newStatus = $this->calculateInvoiceStatus($invoice->total_amount, $invoice->paid_amount);
 
         $this->invoiceModel->update($invoiceId, [
             'status' => $newStatus,
@@ -198,15 +141,15 @@ class InvoiceService
             throw new \InvalidArgumentException('Invoice not found');
         }
 
-        if ($invoice['status'] === 'paid') {
+        if ($invoice->status === 'paid') {
             throw new \InvalidArgumentException('Invoice already paid');
         }
 
-        if ($invoice['status'] === 'cancelled') {
+        if ($invoice->status === 'cancelled') {
             throw new \InvalidArgumentException('Invoice is cancelled');
         }
 
-        $remaining = $invoice['total_amount'] - $invoice['paid_amount'];
+        $remaining = $invoice->total_amount - $invoice->paid_amount;
         if ($remaining <= 0) {
             throw new \InvalidArgumentException('Invoice already fully paid');
         }
@@ -242,7 +185,7 @@ class InvoiceService
             ->first();
 
         if ($lastPayment) {
-            $lastNumber = (int)substr($lastPayment['payment_code'], -6);
+            $lastNumber = (int) substr($lastPayment->payment_code, -6);
             $newNumber = $lastNumber + 1;
         } else {
             $newNumber = 1;
@@ -254,15 +197,15 @@ class InvoiceService
     /**
      * Get invoice with payments
      */
-    public function getInvoiceWithPayments(int $invoiceId): array
+    public function getInvoiceWithPayments(int $invoiceId, ?int $tenantId = null): array
     {
-        $invoice = $this->invoiceModel->getWithDetails($invoiceId);
+        $invoice = $this->invoiceModel->getWithDetails($invoiceId, $tenantId);
         if (!$invoice) {
             throw new \InvalidArgumentException('Invoice not found');
         }
 
-        $payments = $this->paymentModel->getByInvoice($invoiceId);
-        $refunds = $this->refundModel->getByInvoice($invoiceId);
+        $payments = $this->paymentModel->getByInvoice($invoiceId, $tenantId);
+        $refunds = $this->refundModel->getByInvoice($invoiceId, $tenantId);
 
         return [
             'invoice' => $invoice,
@@ -274,12 +217,14 @@ class InvoiceService
     /**
      * Get invoices by reference
      */
-    public function getInvoicesByRef(string $refType, int $refId): array
+    public function getInvoicesByRef(string $refType, int $refId, ?int $tenantId = null): array
     {
-        return $this->invoiceModel
+        $builder = $this->invoiceModel
             ->where('ref_type', $refType)
-            ->where('ref_id', $refId)
-            ->orderBy('created_at', 'DESC')
-            ->findAll();
+            ->where('ref_id', $refId);
+        if ($tenantId !== null) {
+            $builder->where('tenant_id', $tenantId);
+        }
+        return $builder->orderBy('created_at', 'DESC')->findAll();
     }
 }

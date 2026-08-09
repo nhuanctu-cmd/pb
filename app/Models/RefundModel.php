@@ -24,10 +24,25 @@ class RefundModel extends Model
         'status'     => 'required|in_list[pending,approved,rejected,completed]',
     ];
 
-    public function getByInvoice(int $invoiceId)
+    public function getByInvoice(int $invoiceId, ?int $tenantId = null)
     {
-        return $this->where('invoice_id', $invoiceId)
+        $builder = $this->where('invoice_id', $invoiceId);
+        if ($tenantId !== null) {
+            $builder->where('tenant_id', $tenantId);
+        }
+        return $builder
             ->orderBy('created_at', 'DESC')
             ->findAll();
+    }
+
+    public function getCompletedTotal(int $invoiceId, ?int $tenantId = null): float
+    {
+        $builder = $this->selectSum('amount')
+            ->where('invoice_id', $invoiceId)
+            ->where('status', 'completed');
+        if ($tenantId !== null) {
+            $builder->where('tenant_id', $tenantId);
+        }
+        return (float) ($builder->first()->amount ?? 0);
     }
 }

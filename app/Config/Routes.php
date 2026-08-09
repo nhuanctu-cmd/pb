@@ -163,7 +163,12 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
             $routes->post('create', 'BranchController::store');
             $routes->get('edit/(:num)', 'BranchController::edit/$1');
             $routes->post('update/(:num)', 'BranchController::update/$1');
-            $routes->get('delete/(:num)', 'BranchController::delete/$1');
+            $routes->post('delete/(:num)', 'BranchController::delete/$1');
+            $routes->get('hours/(:num)', 'BranchController::hours/$1');
+            $routes->post('save-hours/(:num)', 'BranchController::saveHours/$1');
+            $routes->get('holidays/(:num)', 'BranchController::holidays/$1');
+            $routes->post('store-holiday/(:num)', 'BranchController::storeHoliday/$1');
+            $routes->post('delete-holiday/(:num)/(:num)', 'BranchController::deleteHoliday/$1/$2');
         });
 
         // User routes

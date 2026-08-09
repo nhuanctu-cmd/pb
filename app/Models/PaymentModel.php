@@ -25,16 +25,38 @@ class PaymentModel extends Model
         'status'         => 'required|in_list[pending,success,failed,cancelled]',
     ];
 
-    public function getByInvoice(int $invoiceId)
+    public function getByInvoice(int $invoiceId, ?int $tenantId = null)
     {
-        return $this->where('invoice_id', $invoiceId)
+        $builder = $this->where('invoice_id', $invoiceId);
+        if ($tenantId !== null) {
+            $builder->where('tenant_id', $tenantId);
+        }
+        return $builder
             ->orderBy('created_at', 'DESC')
             ->findAll();
     }
 
-    public function findByIdempotencyKey(string $key)
+    public function findByIdempotencyKey(string $key, ?int $tenantId = null)
     {
-        return $this->where('idempotency_key', $key)->first();
+        $builder = $this->where('idempotency_key', $key);
+        if ($tenantId !== null) {
+            $builder->where('tenant_id', $tenantId);
+        }
+        return $builder->first();
+    }
+
+    public function findForUpdate(int $paymentId, ?int $tenantId = null): ?\App\Entities\Payment
+    {
+        $sql = 'SELECT * FROM payments WHERE id = ?';
+        $params = [$paymentId];
+        if ($tenantId !== null) {
+            $sql .= ' AND tenant_id = ?';
+            $params[] = $tenantId;
+        }
+        $sql .= ' LIMIT 1 FOR UPDATE';
+        $row = $this->db->query($sql, $params)->getRowArray();
+
+        return $row ? new \App\Entities\Payment($row) : null;
     }
 
     public function getByTenant(int $tenantId, ?string $status = null, int $limit = 100)

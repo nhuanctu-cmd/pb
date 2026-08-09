@@ -77,6 +77,20 @@ class ApiAuthFilterTest extends CIUnitTestCase
         $this->assertSame(401, $result->getStatusCode());
     }
 
+    public function testRejectsTamperedSignedToken(): void
+    {
+        $token = ApiAuthFilter::generateToken(['user_id' => 1, 'tenant_id' => 1]);
+        $payload = json_decode(base64_decode($token), true);
+        $payload['tenant_id'] = 999;
+
+        $request = $this->makeRequest();
+        $request->setHeader('Authorization', 'Bearer ' . base64_encode(json_encode($payload)));
+
+        $result = (new ApiAuthFilter())->before($request);
+
+        $this->assertSame(401, $result->getStatusCode());
+    }
+
     /** generateToken tạo token đọc ngược được, exp 30 ngày */
     public function testGenerateTokenRoundtrip(): void
     {

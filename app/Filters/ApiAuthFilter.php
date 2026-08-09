@@ -54,10 +54,17 @@ class ApiAuthFilter implements FilterInterface
     private function validateToken(string $token): ?array
     {
         try {
-            $payload = base64_decode($token);
+            $payload = base64_decode($token, true);
             $data = json_decode($payload, true);
 
-            if (!$data || !isset($data['user_id'])) {
+            if (!$data || !isset($data['user_id'], $data['sig'])) {
+                return null;
+            }
+
+            $signature = (string) $data['sig'];
+            unset($data['sig']);
+            $expected = $this->sign($data);
+            if (! hash_equals($expected, $signature)) {
                 return null;
             }
 
@@ -76,6 +83,22 @@ class ApiAuthFilter implements FilterInterface
     {
         $payload['iat'] = time();
         $payload['exp'] = time() + (86400 * 30); // 30 days
-        return base64_encode(json_encode($payload));
+        $payload['sig'] = (new self())->sign($payload);
+        return base64_encode(json_encode($payload, JSON_UNESCAPED_SLASHES));
+    }
+
+    private function sign(array $payload): string
+    {
+        unset($payload['sig']);
+        $key = (string) config('Encryption')->key;
+        if ($key === '') {
+            throw new \RuntimeException('Encryption key is required for API tokens.');
+        }
+
+        return hash_hmac(
+            'sha256',
+            json_encode($payload, JSON_UNESCAPED_SLASHES),
+            $key
+        );
     }
 }

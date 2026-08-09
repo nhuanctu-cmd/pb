@@ -57,7 +57,9 @@ class PaymentController extends BaseController
      */
     public function detail(int $invoiceId): string
     {
-        $details = $this->invoiceService->getInvoiceWithPayments($invoiceId);
+        $details = $this->invoiceService->getInvoiceWithPayments(
+            $invoiceId, (int) session()->get('tenant_id')
+        );
 
         $data = [
             'invoice' => $details['invoice'],
@@ -77,19 +79,16 @@ class PaymentController extends BaseController
         $branchId = session()->get('branch_id');
         $userId = session()->get('user_id');
 
-        $booking = $this->bookingModel->find($bookingId);
+        $booking = $this->bookingModel->findForTenant($bookingId, (int) $tenantId);
         if (!$booking) {
             return $this->response->setStatusCode(404)->setJSON(['error' => 'Booking not found']);
         }
 
         // Check if invoice already exists
-        $existing = $this->invoiceService->getInvoicesByRef('booking', $bookingId);
+        $existing = $this->invoiceService->getInvoicesByRef('booking', $bookingId, (int) $tenantId);
         if (!empty($existing)) {
             return $this->response->setStatusCode(400)->setJSON(['error' => 'Invoice already exists']);
         }
-
-        $db = \Config\Database::connect();
-        $db->transStart();
 
         try {
             // Generate invoice code
@@ -104,15 +103,12 @@ class PaymentController extends BaseController
                 'created_by' => $userId,
             ]);
 
-            $db->transComplete();
-
             return $this->response->setJSON([
                 'success' => true,
                 'invoice_id' => $invoice->id,
                 'invoice_code' => $invoice->invoice_code,
             ]);
         } catch (\Exception $e) {
-            $db->transRollback();
             return $this->response->setStatusCode(400)->setJSON(['error' => $e->getMessage()]);
         }
     }
@@ -127,9 +123,10 @@ class PaymentController extends BaseController
 
         try {
             $result = $this->paymentService->payCash($invoiceId, $amount, [
-                'idempotency_key' => 'cash_' . $invoiceId . '_' . time(),
+                'idempotency_key' => $this->request->getHeaderLine('Idempotency-Key')
+                    ?: ('cash_' . $invoiceId . '_' . bin2hex(random_bytes(8))),
                 'created_by' => $userId,
-            ]);
+            ], (int) session()->get('tenant_id'));
 
             return $this->response->setJSON($result);
         } catch (\Exception $e) {
@@ -143,7 +140,9 @@ class PaymentController extends BaseController
     public function createBankQr(int $invoiceId): ResponseInterface
     {
         try {
-            $result = $this->paymentService->createBankQr($invoiceId);
+            $result = $this->paymentService->createBankQr(
+                $invoiceId, (int) session()->get('tenant_id'), ['created_by' => session()->get('user_id')]
+            );
             return $this->response->setJSON($result);
         } catch (\Exception $e) {
             return $this->response->setStatusCode(400)->setJSON(['error' => $e->getMessage()]);
@@ -159,7 +158,10 @@ class PaymentController extends BaseController
         $idempotencyKey = $this->request->getPost('idempotency_key');
 
         try {
-            $result = $this->paymentService->confirmBankPayment($paymentId, $transactionRef, $idempotencyKey);
+            $result = $this->paymentService->confirmBankPayment(
+                $paymentId, (string) $transactionRef, $idempotencyKey,
+                (int) session()->get('tenant_id')
+            );
             return $this->response->setJSON($result);
         } catch (\Exception $e) {
             return $this->response->setStatusCode(400)->setJSON(['error' => $e->getMessage()]);
@@ -176,7 +178,9 @@ class PaymentController extends BaseController
         $userId = session()->get('user_id');
 
         try {
-            $result = $this->paymentService->refund($invoiceId, $amount, $reason, $userId);
+            $result = $this->paymentService->refund(
+                $invoiceId, $amount, $reason, $userId, (int) session()->get('tenant_id')
+            );
             return $this->response->setJSON($result);
         } catch (\Exception $e) {
             return $this->response->setStatusCode(400)->setJSON(['error' => $e->getMessage()]);
@@ -191,7 +195,9 @@ class PaymentController extends BaseController
         $reason = $this->request->getPost('reason');
 
         try {
-            $success = $this->invoiceService->cancelInvoice($invoiceId, $reason);
+            $success = $this->invoiceService->cancelInvoice(
+                $invoiceId, $reason, (int) session()->get('tenant_id')
+            );
             return $this->response->setJSON(['success' => $success]);
         } catch (\Exception $e) {
             return $this->response->setStatusCode(400)->setJSON(['error' => $e->getMessage()]);
@@ -224,11 +230,17 @@ class PaymentController extends BaseController
             'status' => 'active',
         ];
 
-        // Deactivate existing
+        $db = \Config\Database::connect();
+        $db->transStart();
         $this->qrConfigModel->where('tenant_id', $tenantId)->set(['status' => 'inactive'])->update();
-
-        // Insert new
-        $this->qrConfigModel->insert($data);
+        if (! $this->qrConfigModel->insert($data)) {
+            $db->transRollback();
+            return $this->response->setStatusCode(422)->setJSON(['success' => false]);
+        }
+        $db->transComplete();
+        if ($db->transStatus() === false) {
+            return $this->response->setStatusCode(500)->setJSON(['success' => false]);
+        }
 
         return $this->response->setJSON(['success' => true]);
     }

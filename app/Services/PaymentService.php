@@ -28,46 +28,62 @@ class PaymentService
     /**
      * Pay cash
      */
-    public function payCash(int $invoiceId, float $amount, array $data = []): array
+    public function payCash(int $invoiceId, float $amount, array $data = [], ?int $tenantId = null): array
     {
-        return $this->processPayment($invoiceId, $amount, 'cash', $data);
+        return $this->pay($invoiceId, $amount, 'cash', $data, $tenantId);
+    }
+
+    public function pay(int $invoiceId, float $amount, string $method, array $data = [], ?int $tenantId = null): array
+    {
+        if (! in_array($method, ['cash', 'wallet', 'bank_qr', 'momo', 'stripe'], true)) {
+            throw new \InvalidArgumentException('Unsupported payment method');
+        }
+
+        return $this->processPayment($invoiceId, $amount, $method, $data, $tenantId);
     }
 
     /**
      * Pay by wallet
      */
-    public function payByWallet(int $invoiceId, float $amount, int $playerId, array $data = []): array
+    public function payByWallet(int $invoiceId, float $amount, int $playerId, array $data = [], ?int $tenantId = null): array
     {
         // TODO: Integrate with WalletService
         // For now, just process as regular payment
-        return $this->processPayment($invoiceId, $amount, 'wallet', array_merge($data, ['player_id' => $playerId]));
+        return $this->processPayment($invoiceId, $amount, 'wallet', array_merge($data, ['player_id' => $playerId]), $tenantId);
     }
 
     /**
      * Create bank QR payment
      */
-    public function createBankQr(int $invoiceId): array
+    public function createBankQr(int $invoiceId, ?int $tenantId = null, array $data = []): array
     {
-        $invoice = $this->invoiceModel->find($invoiceId);
+        $invoice = $tenantId === null
+            ? $this->invoiceModel->find($invoiceId)
+            : $this->invoiceModel->findForTenant($invoiceId, $tenantId);
         if (!$invoice) {
             throw new \InvalidArgumentException('Invoice not found');
         }
 
-        $qrConfig = $this->qrConfigModel->getActiveByTenant($invoice['tenant_id']);
+        $remaining = round((float) $invoice->total_amount - (float) $invoice->paid_amount, 2);
+        if ($remaining <= 0 || in_array($invoice->status, ['paid', 'cancelled', 'refunded'], true)) {
+            throw new \InvalidArgumentException('Invoice is not payable');
+        }
+
+        $qrConfig = $this->qrConfigModel->getActiveByTenant((int) $invoice->tenant_id);
         if (!$qrConfig) {
             throw new \InvalidArgumentException('Bank QR config not found');
         }
 
         // Generate payment code
-        $paymentCode = $this->generatePaymentCode($invoice['tenant_id']);
+        $paymentCode = $this->generatePaymentCode((int) $invoice->tenant_id);
 
         // Create pending payment
         $paymentData = [
-            'tenant_id' => $invoice['tenant_id'],
+            'tenant_id' => $invoice->tenant_id,
             'invoice_id' => $invoiceId,
             'payment_code' => $paymentCode,
             'method' => 'bank_qr',
-            'amount' => $invoice['total_amount'] - $invoice['paid_amount'],
+            'amount' => $remaining,
             'status' => 'pending',
             'created_by' => $data['created_by'] ?? null,
             'created_at' => date('Y-m-d H:i:s'),
@@ -86,9 +102,9 @@ class PaymentService
             'qr_content' => $qrContent,
             'amount' => $paymentData['amount'],
             'bank_info' => [
-                'bank_name' => $qrConfig['bank_name'],
-                'account_number' => $qrConfig['bank_account'],
-                'account_name' => $qrConfig['account_name'],
+            'bank_name' => $qrConfig->bank_name,
+            'account_number' => $qrConfig->bank_account,
+            'account_name' => $qrConfig->account_name,
             ],
         ];
     }
@@ -96,27 +112,42 @@ class PaymentService
     /**
      * Confirm bank payment
      */
-    public function confirmBankPayment(int $paymentId, string $transactionRef, ?string $idempotencyKey = null): array
+    public function confirmBankPayment(int $paymentId, string $transactionRef, ?string $idempotencyKey = null, ?int $tenantId = null): array
     {
         $db = \Config\Database::connect();
         $db->transStart();
 
         try {
-            $payment = $this->paymentModel->find($paymentId);
+            $payment = $this->paymentModel->findForUpdate($paymentId, $tenantId);
             if (!$payment) {
                 throw new \InvalidArgumentException('Payment not found');
             }
 
-            if ($payment['status'] !== 'pending') {
+            if ($payment->status === 'success') {
+                if ($idempotencyKey && $payment->idempotency_key === $idempotencyKey) {
+                    $db->transComplete();
+                    return [
+                        'success' => true, 'duplicate' => true,
+                        'payment_id' => $payment->id,
+                        'payment_code' => $payment->payment_code,
+                    ];
+                }
                 throw new \InvalidArgumentException('Payment already processed');
+            }
+            if ($payment->status !== 'pending') {
+                throw new \InvalidArgumentException('Payment cannot be confirmed');
             }
 
             // Check idempotency
             if ($idempotencyKey) {
-                $existing = $this->paymentModel->findByIdempotencyKey($idempotencyKey);
+                $existing = $this->paymentModel->findByIdempotencyKey($idempotencyKey, $tenantId);
                 if ($existing && $existing['id'] != $paymentId) {
                     throw new \InvalidArgumentException('Duplicate payment confirmation');
                 }
+            }
+
+            if (trim($transactionRef) === '') {
+                throw new \InvalidArgumentException('Transaction reference is required');
             }
 
             // Update payment
@@ -129,11 +160,17 @@ class PaymentService
             ]);
 
             // Update invoice
-            $invoice = $this->invoiceModel->find($payment['invoice_id']);
-            $newPaidAmount = $invoice['paid_amount'] + $payment['amount'];
-            $newStatus = $this->calculateInvoiceStatus($invoice['total_amount'], $newPaidAmount);
+            $invoice = $this->invoiceModel->findForUpdate((int) $payment->invoice_id, $tenantId);
+            if (! $invoice) {
+                throw new \InvalidArgumentException('Invoice not found');
+            }
+            $newPaidAmount = round((float) $invoice->paid_amount + (float) $payment->amount, 2);
+            if ($newPaidAmount > (float) $invoice->total_amount) {
+                throw new \InvalidArgumentException('Payment exceeds invoice total');
+            }
+            $newStatus = $this->calculateInvoiceStatus($invoice->total_amount, $newPaidAmount);
 
-            $this->invoiceModel->update($payment['invoice_id'], [
+            $this->invoiceModel->update($payment->invoice_id, [
                 'paid_amount' => $newPaidAmount,
                 'status' => $newStatus,
                 'updated_at' => date('Y-m-d H:i:s'),
@@ -141,9 +178,13 @@ class PaymentService
 
             $db->transComplete();
 
+            if ($db->transStatus() === false) {
+                throw new \RuntimeException('Payment confirmation failed');
+            }
+
             return [
                 'success' => true,
-                'payment_code' => $payment['payment_code'],
+                'payment_code' => $payment->payment_code,
                 'new_status' => $newStatus,
             ];
         } catch (\Exception $e) {
@@ -155,56 +196,78 @@ class PaymentService
     /**
      * Process refund
      */
-    public function refund(int $invoiceId, float $amount, ?string $reason = null, ?int $userId = null): array
+    public function refund(int $invoiceId, float $amount, ?string $reason = null, ?int $userId = null, ?int $tenantId = null): array
     {
+        $amount = round($amount, 2);
+        if ($amount <= 0) {
+            throw new \InvalidArgumentException('Refund amount must be greater than zero');
+        }
         $db = \Config\Database::connect();
         $db->transStart();
 
         try {
-            $invoice = $this->invoiceModel->find($invoiceId);
+            $invoice = $this->invoiceModel->findForUpdate($invoiceId, $tenantId);
             if (!$invoice) {
                 throw new \InvalidArgumentException('Invoice not found');
             }
 
-            if ($invoice['status'] === 'cancelled') {
+            if ($invoice->status === 'cancelled') {
                 throw new \InvalidArgumentException('Invoice is cancelled');
             }
 
-            // Get the latest successful payment
-            $payments = $this->paymentModel
+            $refundableTotal = round((float) $invoice->paid_amount, 2);
+            if ($amount > $refundableTotal) {
+                throw new \InvalidArgumentException('Refund amount exceeds refundable balance');
+            }
+
+            // Allocate the refund across successful payments, preserving a
+            // traceable payment -> refund relationship.
+            $paymentQuery = $this->paymentModel
                 ->where('invoice_id', $invoiceId)
-                ->where('status', 'success')
-                ->orderBy('created_at', 'DESC')
-                ->findAll();
+                ->where('status', 'success');
+            if ($tenantId !== null) {
+                $paymentQuery->where('tenant_id', $tenantId);
+            }
+            $payments = $paymentQuery->orderBy('created_at', 'DESC')->findAll();
 
             if (empty($payments)) {
                 throw new \InvalidArgumentException('No successful payment to refund');
             }
 
-            $payment = $payments[0];
-
-            // Check refund amount
-            if ($amount > $payment['amount']) {
-                throw new \InvalidArgumentException('Refund amount exceeds payment amount');
+            $remainingRefund = $amount;
+            $refundIds = [];
+            foreach ($payments as $payment) {
+                if ($remainingRefund <= 0) {
+                    break;
+                }
+                $alreadyRefunded = $this->refundModel
+                    ->selectSum('amount')
+                    ->where('payment_id', $payment->id)
+                    ->where('status', 'completed')
+                    ->first();
+                $available = max(0, round((float) $payment->amount - (float) ($alreadyRefunded->amount ?? 0), 2));
+                $chunk = min($remainingRefund, $available);
+                if ($chunk <= 0) {
+                    continue;
+                }
+                $refund = new Refund();
+                $refund->tenant_id = $invoice->tenant_id;
+                $refund->payment_id = $payment->id;
+                $refund->invoice_id = $invoiceId;
+                $refund->amount = $chunk;
+                $refund->reason = $reason;
+                $refund->status = 'completed';
+                $refund->processed_by = $userId;
+                $refundIds[] = $this->refundModel->insert($refund);
+                $remainingRefund = round($remainingRefund - $chunk, 2);
+            }
+            if ($remainingRefund > 0.01) {
+                throw new \InvalidArgumentException('Refund amount exceeds refundable payments');
             }
 
-            // Create refund record
-            $refund = new Refund();
-            $refund->tenant_id = $invoice['tenant_id'];
-            $refund->payment_id = $payment['id'];
-            $refund->invoice_id = $invoiceId;
-            $refund->amount = $amount;
-            $refund->reason = $reason;
-            $refund->status = 'completed';
-            $refund->processed_by = $userId;
-            $refund->created_at = date('Y-m-d H:i:s');
-            $refund->updated_at = date('Y-m-d H:i:s');
-
-            $refundId = $this->refundModel->insert($refund);
-
             // Update invoice
-            $newPaidAmount = $invoice['paid_amount'] - $amount;
-            $newStatus = $this->calculateInvoiceStatus($invoice['total_amount'], $newPaidAmount);
+            $newPaidAmount = round((float) $invoice->paid_amount - $amount, 2);
+            $newStatus = $this->calculateInvoiceStatus($invoice->total_amount, $newPaidAmount);
 
             $this->invoiceModel->update($invoiceId, [
                 'paid_amount' => $newPaidAmount,
@@ -216,9 +279,9 @@ class PaymentService
 
             return [
                 'success' => true,
-                'refund_id' => $refundId,
+                'refund_ids' => $refundIds,
                 'new_paid_amount' => $newPaidAmount,
-                'new_status' => $newStatus,
+                'new_status' => $newStatus === 'unpaid' ? 'refunded' : $newStatus,
             ];
         } catch (\Exception $e) {
             $db->transRollback();
@@ -238,40 +301,60 @@ class PaymentService
     /**
      * Process payment (internal)
      */
-    protected function processPayment(int $invoiceId, float $amount, string $method, array $data = []): array
+    protected function processPayment(int $invoiceId, float $amount, string $method, array $data = [], ?int $tenantId = null): array
     {
+        $amount = round($amount, 2);
+        if ($amount <= 0) {
+            throw new \InvalidArgumentException('Payment amount must be greater than zero');
+        }
         $db = \Config\Database::connect();
         $db->transStart();
 
         try {
-            $invoice = $this->invoiceModel->find($invoiceId);
+            $invoice = $this->invoiceModel->findForUpdate($invoiceId, $tenantId);
             if (!$invoice) {
                 throw new \InvalidArgumentException('Invoice not found');
             }
 
-            if ($invoice['status'] === 'cancelled') {
-                throw new \InvalidArgumentException('Invoice is cancelled');
+            if (in_array($invoice->status, ['cancelled', 'refunded', 'paid'], true)) {
+                throw new \InvalidArgumentException('Invoice is not payable');
             }
 
             // Check idempotency
             if (!empty($data['idempotency_key'])) {
-                $existingPayment = $this->paymentModel->findByIdempotencyKey($data['idempotency_key']);
+                $key = trim((string) $data['idempotency_key']);
+                if (strlen($key) > 64) {
+                    throw new \InvalidArgumentException('Idempotency key is too long');
+                }
+                $existingPayment = $this->paymentModel->findByIdempotencyKey($key, $tenantId);
                 if ($existingPayment) {
+                    if ((int) $existingPayment->invoice_id !== $invoiceId
+                        || (float) $existingPayment->amount !== $amount
+                        || $existingPayment->method !== $method) {
+                        throw new \InvalidArgumentException('Idempotency key was reused with different payment data');
+                    }
+                    $db->transComplete();
                     return [
                         'success' => true,
-                        'payment_id' => $existingPayment['id'],
-                        'payment_code' => $existingPayment['payment_code'],
+                        'payment_id' => $existingPayment->id,
+                        'payment_code' => $existingPayment->payment_code,
                         'duplicate' => true,
                     ];
                 }
+                $data['idempotency_key'] = $key;
+            }
+
+            $remaining = round((float) $invoice->total_amount - (float) $invoice->paid_amount, 2);
+            if ($amount > $remaining) {
+                throw new \InvalidArgumentException('Payment exceeds invoice balance');
             }
 
             // Generate payment code
-            $paymentCode = $this->generatePaymentCode($invoice['tenant_id']);
+            $paymentCode = $this->generatePaymentCode((int) $invoice->tenant_id);
 
             // Create payment
             $paymentData = [
-                'tenant_id' => $invoice['tenant_id'],
+                'tenant_id' => $invoice->tenant_id,
                 'invoice_id' => $invoiceId,
                 'payment_code' => $paymentCode,
                 'method' => $method,
@@ -286,18 +369,27 @@ class PaymentService
             ];
 
             $paymentId = $this->paymentModel->insert($paymentData);
+            if (! $paymentId) {
+                throw new \RuntimeException('Payment could not be recorded');
+            }
 
             // Update invoice
-            $newPaidAmount = $invoice['paid_amount'] + $amount;
-            $newStatus = $this->calculateInvoiceStatus($invoice['total_amount'], $newPaidAmount);
+            $newPaidAmount = round((float) $invoice->paid_amount + $amount, 2);
+            $newStatus = $this->calculateInvoiceStatus($invoice->total_amount, $newPaidAmount);
 
-            $this->invoiceModel->update($invoiceId, [
+            if (! $this->invoiceModel->update($invoiceId, [
                 'paid_amount' => $newPaidAmount,
                 'status' => $newStatus,
                 'updated_at' => date('Y-m-d H:i:s'),
-            ]);
+            ])) {
+                throw new \RuntimeException('Invoice payment status could not be updated');
+            }
 
             $db->transComplete();
+
+            if ($db->transStatus() === false) {
+                throw new \RuntimeException('Payment transaction failed');
+            }
 
             return [
                 'success' => true,
@@ -317,22 +409,10 @@ class PaymentService
      */
     protected function generatePaymentCode(int $tenantId): string
     {
-        $date = date('Ymd');
-        $prefix = "PAY{$tenantId}{$date}";
-
-        $lastPayment = $this->paymentModel
-            ->where('payment_code LIKE', $prefix . '%')
-            ->orderBy('id', 'DESC')
-            ->first();
-
-        if ($lastPayment) {
-            $lastNumber = (int)substr($lastPayment['payment_code'], -6);
-            $newNumber = $lastNumber + 1;
-        } else {
-            $newNumber = 1;
-        }
-
-        return $prefix . str_pad($newNumber, 6, '0', STR_PAD_LEFT);
+        // Random suffix avoids the read-then-increment race under concurrent
+        // cashiers/webhooks; the database unique key remains the final guard.
+        return 'PAY' . $tenantId . date('YmdHis')
+            . strtoupper(bin2hex(random_bytes(4)));
     }
 
     /**
@@ -356,11 +436,11 @@ class PaymentService
     {
         // Simple QR format (in real implementation, use proper VietQR library)
         $data = [
-            'bank' => $qrConfig['bank_name'],
-            'account' => $qrConfig['bank_account'],
-            'name' => $qrConfig['account_name'],
-            'amount' => $invoice['total_amount'] - $invoice['paid_amount'],
-            'content' => "Payment for invoice {$invoice['invoice_code']}",
+            'bank' => $qrConfig->bank_name,
+            'account' => $qrConfig->bank_account,
+            'name' => $qrConfig->account_name,
+            'amount' => $invoice->total_amount - $invoice->paid_amount,
+            'content' => "Payment for invoice {$invoice->invoice_code}",
         ];
 
         return json_encode($data);

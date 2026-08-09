@@ -43,12 +43,16 @@ class BookingsController extends BaseController
         if ($search) $filters['search'] = $search;
 
         if ($branchId) {
-            $bookings = $this->bookingModel->getByBranch($branchId, $filters);
+            $ownedBranch = $this->branchModel->where('id', (int) $branchId)
+                ->where('tenant_id', (int) $tenantId)->first();
+            $bookings = $ownedBranch
+                ? $this->bookingModel->getByBranch((int) $branchId, $filters, (int) $tenantId)
+                : [];
         } else {
             $bookings = [];
             $branches = $this->branchModel->getByTenant($tenantId);
             foreach ($branches as $branch) {
-                $branchBookings = $this->bookingModel->getByBranch($branch->id, $filters);
+                $branchBookings = $this->bookingModel->getByBranch($branch->id, $filters, (int) $tenantId);
                 $bookings = array_merge($bookings, $branchBookings);
             }
             usort($bookings, function ($a, $b) {
@@ -88,7 +92,7 @@ class BookingsController extends BaseController
 
         $events = [];
         if ($branchId) {
-            $events = $this->bookingModel->getCalendarEvents($branchId, $dateFrom, $dateTo);
+            $events = $this->bookingModel->getCalendarEvents($branchId, $dateFrom, $dateTo, (int) $tenantId);
         }
 
         return $this->render('admin/bookings/calendar', [
@@ -176,7 +180,8 @@ class BookingsController extends BaseController
      */
     public function show($id)
     {
-        $booking = $this->bookingModel->find($id);
+        $tenantId = (int) session()->get('tenant_id');
+        $booking = $this->bookingModel->findForTenant((int) $id, $tenantId);
         if (!$booking) {
             return redirect()->to('/admin/bookings')->with('error', lang('App.booking_not_found'));
         }
@@ -185,6 +190,7 @@ class BookingsController extends BaseController
         $logs  = model(BookingLogModel::class)->getByBooking($id);
         $qrCode = model(BookingQrCodeModel::class)
             ->where('booking_id', $id)
+            ->where('tenant_id', $tenantId)
             ->where('status', 'active')
             ->first();
 
@@ -203,34 +209,12 @@ class BookingsController extends BaseController
     public function checkIn($id)
     {
         $userId = session()->get('user_id');
-        $booking = $this->bookingModel->find($id);
-
-        if (!$booking) {
-            return redirect()->back()->with('error', lang('App.booking_not_found'));
-        }
-
-        // Update directly
-        $this->bookingModel->update($id, [
-            'status'        => 'checked_in',
-            'checked_in_at' => date('Y-m-d H:i:s'),
-            'updated_by'    => $userId,
-        ]);
-
-        // Mark court as occupied
-        $items = model(BookingItemModel::class)->getByBooking($id);
-        foreach ($items as $item) {
-            $this->courtModel->update($item->court_id, ['status' => 'occupied']);
-        }
-
-        // Log
-        model(BookingLogModel::class)->addLog(
-            $booking->tenant_id, $id, 'checked_in',
-            $booking->status, 'checked_in',
-            lang('App.checked_in_via_admin'),
-            $userId
+        $result = $this->bookingService->checkIn(
+            (int) $id, $userId ? (int) $userId : null,
+            (int) session()->get('tenant_id')
         );
 
-        return redirect()->back()->with('success', lang('App.check_in_success'));
+        return redirect()->back()->with($result['success'] ? 'success' : 'error', $result['message']);
     }
 
     /**
@@ -241,7 +225,7 @@ class BookingsController extends BaseController
         $userId = session()->get('user_id');
         $reason = $this->request->getPost('reason');
 
-        $result = $this->bookingService->cancelBooking($id, $reason, $userId);
+        $result = $this->bookingService->cancelBooking($id, $reason, $userId, (int) session()->get('tenant_id'));
 
         if ($result['success']) {
             return redirect()->to('/admin/bookings')->with('success', lang('App.booking_cancelled_success'));
@@ -255,7 +239,8 @@ class BookingsController extends BaseController
      */
     public function reschedule($id)
     {
-        $booking = $this->bookingModel->find($id);
+        $tenantId = (int) session()->get('tenant_id');
+        $booking = $this->bookingModel->findForTenant((int) $id, $tenantId);
         if (!$booking) {
             return redirect()->to('/admin/bookings')->with('error', lang('App.booking_not_found'));
         }
@@ -287,7 +272,7 @@ class BookingsController extends BaseController
             'end_time'     => $this->request->getPost('end_time'),
         ];
 
-        $result = $this->bookingService->rescheduleBooking($id, $newData, $userId);
+        $result = $this->bookingService->rescheduleBooking($id, $newData, $userId, (int) session()->get('tenant_id'));
 
         if ($result['success']) {
             return redirect()->to('/admin/bookings/show/' . $id)->with('success', lang('App.booking_rescheduled_success'));
@@ -304,7 +289,7 @@ class BookingsController extends BaseController
         $token = $this->request->getPost('qr_token');
         $userId = session()->get('user_id');
 
-        $result = $this->bookingService->checkInByQr($token, $userId);
+        $result = $this->bookingService->checkInByQr($token, $userId, (int) session()->get('tenant_id'));
 
         if ($result['success']) {
             return redirect()->to('/admin/bookings/show/' . $result['booking']->id)->with('success', lang('App.check_in_success'));

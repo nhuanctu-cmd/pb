@@ -1,0 +1,27 @@
+<?php
+
+return [
+    'loginTitle'       => 'Đăng nhập',
+    'loginSubtitle'    => 'Đăng nhập vào tài khoản của bạn',
+    'email'            => 'Email',
+    'password'         => 'Mật khẩu',
+    'rememberMe'       => 'Ghi nhớ đăng nhập',
+    'login'            => 'Đăng nhập',
+    'logout'           => 'Đăng xuất',
+    'forgotPassword'   => 'Quên mật khẩu?',
+    'register'         => 'Đăng ký',
+    'profile'          => 'Hồ sơ',
+    'changePassword'   => 'Đổi mật khẩu',
+    'loginRequired'    => 'Vui lòng đăng nhập để tiếp tục.',
+    'sessionExpired'   => 'Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.',
+    'invalidCredentials' => 'Email hoặc mật khẩu không đúng.',
+    'accountInactive'  => 'Tài khoản của bạn đang bị vô hiệu hóa.',
+    'accountSuspended' => 'Tài khoản của bạn đã bị tạm ngưng.',
+    'loginSuccess'     => 'Đăng nhập thành công.',
+    'logoutSuccess'    => 'Đăng xuất thành công.',
+    'forbidden'        => 'Bạn không có quyền thực hiện thao tác này.',
+    'passwordChanged'  => 'Đổi mật khẩu thành công.',
+    'oldPassword'      => 'Mật khẩu hiện tại',
+    'newPassword'      => 'Mật khẩu mới',
+    'confirmPassword'  => 'Xác nhận mật khẩu',
+];

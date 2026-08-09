@@ -1,0 +1,27 @@
+<?php
+
+return [
+    'loginTitle'       => 'Login',
+    'loginSubtitle'    => 'Sign in to your account',
+    'email'            => 'Email',
+    'password'         => 'Password',
+    'rememberMe'       => 'Remember me',
+    'login'            => 'Login',
+    'logout'           => 'Logout',
+    'forgotPassword'   => 'Forgot password?',
+    'register'         => 'Register',
+    'profile'          => 'Profile',
+    'changePassword'   => 'Change Password',
+    'loginRequired'    => 'Please login to continue.',
+    'sessionExpired'   => 'Your session has expired. Please login again.',
+    'invalidCredentials' => 'Invalid email or password.',
+    'accountInactive'  => 'Your account is inactive.',
+    'accountSuspended' => 'Your account has been suspended.',
+    'loginSuccess'     => 'Login successful.',
+    'logoutSuccess'    => 'Logout successful.',
+    'forbidden'        => 'You do not have permission to perform this action.',
+    'passwordChanged'  => 'Password changed successfully.',
+    'oldPassword'      => 'Current Password',
+    'newPassword'      => 'New Password',
+    'confirmPassword'  => 'Confirm Password',
+];

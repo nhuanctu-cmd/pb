@@ -1,0 +1,235 @@
+.erp-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: var(--erp-sidebar-width);
+  background: var(--erp-sidebar);
+  color: #d8e1ef;
+  z-index: 1040;
+  display: flex;
+  flex-direction: column;
+  transition: width .18s ease, transform .18s ease;
+}
+
+.erp-sidebar-brand {
+  min-height: var(--erp-topbar-height);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+
+.erp-brand-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: #ffffff;
+  color: var(--erp-sidebar);
+  font-weight: 800;
+}
+
+.erp-brand-text {
+  min-width: 0;
+}
+
+.erp-brand-name {
+  color: #fff;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.erp-brand-tenant {
+  color: #9fb0c8;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.erp-sidebar-scroll {
+  flex: 1;
+  overflow: auto;
+  padding: 12px 10px;
+}
+
+.erp-menu-group {
+  margin: 12px 0;
+}
+
+.erp-menu-title {
+  padding: 8px 10px;
+  color: #8494ad;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.erp-menu-link {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #d8e1ef;
+  text-decoration: none;
+  border-radius: 7px;
+  padding: 8px 10px;
+  margin: 2px 0;
+  font-weight: 600;
+}
+
+.erp-menu-link:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, .08);
+}
+
+.erp-menu-link.active {
+  color: #fff;
+  background: var(--erp-sidebar-active);
+}
+
+.erp-menu-link .badge {
+  margin-left: auto;
+}
+
+.erp-submenu {
+  margin-left: 28px;
+  border-left: 1px solid rgba(255, 255, 255, .12);
+  padding-left: 8px;
+}
+
+.erp-submenu .erp-menu-link {
+  min-height: 32px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.erp-sidebar-footer {
+  border-top: 1px solid rgba(255, 255, 255, .08);
+  padding: 12px 16px;
+  color: #9fb0c8;
+  font-size: 12px;
+}
+
+.erp-topbar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: var(--erp-sidebar-width);
+  height: var(--erp-topbar-height);
+  background: rgba(255, 255, 255, .96);
+  border-bottom: 1px solid var(--erp-border);
+  z-index: 1030;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 0 20px;
+  transition: left .18s ease;
+  backdrop-filter: blur(10px);
+}
+
+body.erp-sidebar-collapsed .erp-topbar {
+  left: var(--erp-sidebar-collapsed);
+}
+
+.erp-topbar-left,
+.erp-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.erp-topbar-title {
+  min-width: 0;
+}
+
+.erp-topbar-title h1 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.erp-search {
+  width: min(360px, 28vw);
+  position: relative;
+}
+
+.erp-search input {
+  width: 100%;
+  height: 34px;
+  border: 1px solid var(--erp-border);
+  border-radius: 6px;
+  padding: 0 12px 0 34px;
+  background: var(--erp-panel-soft);
+}
+
+.erp-search i {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--erp-muted);
+}
+
+.erp-page-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.erp-page-header h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.erp-page-description {
+  color: var(--erp-muted);
+}
+
+.erp-action-bar,
+.erp-filter-bar,
+.erp-table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  background: var(--erp-panel);
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-radius-md);
+  box-shadow: var(--erp-shadow-sm);
+  margin-bottom: 12px;
+}
+
+.erp-app-footer {
+  margin-left: var(--erp-sidebar-width);
+  padding: 12px 24px 20px;
+  color: var(--erp-muted);
+  font-size: 12px;
+  transition: margin-left .18s ease;
+}
+
+body.erp-sidebar-collapsed .erp-app-footer {
+  margin-left: var(--erp-sidebar-collapsed);
+}
+
+body.erp-sidebar-collapsed .erp-sidebar {
+  width: var(--erp-sidebar-collapsed);
+}
+
+body.erp-sidebar-collapsed .erp-brand-text,
+body.erp-sidebar-collapsed .erp-menu-title,
+body.erp-sidebar-collapsed .erp-menu-label,
+body.erp-sidebar-collapsed .erp-sidebar-footer span,
+body.erp-sidebar-collapsed .erp-submenu {
+  display: none;
+}
+
+body.erp-sidebar-collapsed .erp-menu-link {
+  justify-content: center;
+}

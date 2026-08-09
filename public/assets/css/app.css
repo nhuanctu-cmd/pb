@@ -1,0 +1,122 @@
+:root {
+  --erp-primary: #1769e0;
+  --erp-primary-600: #0f57c5;
+  --erp-success: #0f9f6e;
+  --erp-warning: #d97706;
+  --erp-danger: #dc2626;
+  --erp-info: #0284c7;
+  --erp-dark: #111827;
+  --erp-app-bg: #f3f6fb;
+  --erp-panel: #ffffff;
+  --erp-panel-soft: #f8fafc;
+  --erp-border: #d9e2ef;
+  --erp-border-strong: #b8c4d6;
+  --erp-text: #172033;
+  --erp-muted: #667085;
+  --erp-muted-soft: #98a2b3;
+  --erp-sidebar: #102033;
+  --erp-sidebar-active: #1d4ed8;
+  --erp-radius-xs: 4px;
+  --erp-radius-sm: 6px;
+  --erp-radius-md: 8px;
+  --erp-shadow-sm: 0 1px 2px rgba(16, 24, 40, .08);
+  --erp-shadow-md: 0 8px 24px rgba(16, 24, 40, .12);
+  --erp-space-1: 4px;
+  --erp-space-2: 8px;
+  --erp-space-3: 12px;
+  --erp-space-4: 16px;
+  --erp-space-5: 20px;
+  --erp-space-6: 24px;
+  --erp-topbar-height: 56px;
+  --erp-sidebar-width: 264px;
+  --erp-sidebar-collapsed: 72px;
+  --erp-control-height: 36px;
+  --erp-table-row-height: 48px;
+}
+
+html, body {
+  min-height: 100%;
+}
+
+body.erp-body {
+  margin: 0;
+  background: var(--erp-app-bg);
+  color: var(--erp-text);
+  font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+a {
+  color: var(--erp-primary);
+}
+
+.erp-muted {
+  color: var(--erp-muted);
+}
+
+.erp-page {
+  min-height: 100vh;
+  background: var(--erp-app-bg);
+}
+
+.erp-content {
+  padding: 72px 24px 24px;
+  margin-left: var(--erp-sidebar-width);
+  transition: margin-left .18s ease;
+}
+
+body.erp-sidebar-collapsed .erp-content {
+  margin-left: var(--erp-sidebar-collapsed);
+}
+
+.erp-content-inner {
+  max-width: 1680px;
+  margin: 0 auto;
+}
+
+.erp-panel {
+  background: var(--erp-panel);
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-radius-md);
+  box-shadow: var(--erp-shadow-sm);
+}
+
+.erp-section {
+  margin-bottom: var(--erp-space-5);
+}
+
+.erp-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--erp-space-3);
+  margin-bottom: var(--erp-space-3);
+}
+
+.erp-section-title h2,
+.erp-section-title h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.erp-grid-2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  gap: var(--erp-space-5);
+}
+
+.erp-grid-dashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(360px, .8fr);
+  gap: var(--erp-space-5);
+}
+
+.erp-icon {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}

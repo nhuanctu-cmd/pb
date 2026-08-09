@@ -9,7 +9,7 @@ class ProductCategoryModel extends Model
     protected $table            = 'product_categories';
     protected $primaryKey       = 'id';
     protected $useAutoIncrement = true;
-    protected $returnType       = \App\Entities\ProductCategory::class;
+    protected $returnType       = 'array';
     protected $useSoftDeletes   = false;
     protected $allowedFields    = ['tenant_id', 'name_vi', 'name_en', 'status'];
     protected $useTimestamps    = true;

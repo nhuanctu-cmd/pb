@@ -9,7 +9,7 @@ class ProductModel extends Model
     protected $table            = 'products';
     protected $primaryKey       = 'id';
     protected $useAutoIncrement = true;
-    protected $returnType       = \App\Entities\Product::class;
+    protected $returnType       = 'array';
     protected $useSoftDeletes   = false;
     protected $allowedFields    = ['tenant_id', 'category_id', 'sku', 'name_vi', 'name_en', 'unit', 'cost_price', 'sale_price', 'image', 'status'];
     protected $useTimestamps    = true;

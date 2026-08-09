@@ -32,4 +32,29 @@ return [
     'roleOwner'        => 'Chủ sân',
     'roleManager'      => 'Quản lý chi nhánh',
     'roleStaff'        => 'Nhân viên',
+
+    // Chống brute-force
+    'loginLocked'        => 'Bạn đã đăng nhập sai quá nhiều lần. Vui lòng thử lại sau {0} phút.',
+    'loginAttemptsLeft'  => 'Bạn còn {0} lần thử.',
+
+    // Quên / đặt lại mật khẩu
+    'forgotPasswordTitle'    => 'Quên mật khẩu',
+    'forgotPasswordSubtitle' => 'Nhập email để nhận liên kết đặt lại mật khẩu',
+    'sendResetLink'          => 'Gửi liên kết đặt lại',
+    'backToLogin'            => '← Quay lại đăng nhập',
+    'resetEmailSent'         => 'Nếu email tồn tại trong hệ thống, liên kết đặt lại mật khẩu đã được gửi. Vui lòng kiểm tra hộp thư.',
+    'resetPasswordTitle'     => 'Đặt lại mật khẩu',
+    'resetPasswordSubtitle'  => 'Nhập mật khẩu mới cho tài khoản của bạn',
+    'resetPassword'          => 'Đặt lại mật khẩu',
+    'passwordMinHint'        => 'Mật khẩu tối thiểu 6 ký tự, không trùng 3 mật khẩu gần nhất.',
+    'resetTokenInvalid'      => 'Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.',
+    'resetSuccess'           => 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.',
+    'resetFailed'            => 'Đặt lại mật khẩu thất bại. Vui lòng thử lại.',
+    'passwordReused'         => 'Mật khẩu mới không được trùng 3 mật khẩu gần nhất.',
+
+    // Email đặt lại mật khẩu
+    'resetEmailSubject'  => 'Đặt lại mật khẩu của bạn',
+    'resetEmailGreeting' => 'Xin chào,',
+    'resetEmailBody'     => 'Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn. Liên kết có hiệu lực trong {0} phút:',
+    'resetEmailIgnore'   => 'Nếu bạn không yêu cầu, vui lòng bỏ qua email này. Tài khoản của bạn vẫn an toàn.',
 ];

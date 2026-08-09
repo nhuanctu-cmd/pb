@@ -9,7 +9,7 @@ class InventoryModel extends Model
     protected $table            = 'inventories';
     protected $primaryKey       = ['tenant_id', 'branch_id', 'product_id'];
     protected $useAutoIncrement = false;
-    protected $returnType       = \App\Entities\Inventory::class;
+    protected $returnType       = 'array';
     protected $useSoftDeletes   = false;
     protected $allowedFields    = ['tenant_id', 'branch_id', 'product_id', 'quantity'];
     protected $useTimestamps    = true;

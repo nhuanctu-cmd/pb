@@ -7,6 +7,8 @@ use App\Services\InvoiceService;
 use App\Services\PaymentService;
 use App\Models\BookingModel;
 use App\Models\PlayerModel;
+use App\Models\InvoiceModel;
+use App\Models\PaymentModel;
 use App\Models\PaymentQrConfigModel;
 use CodeIgniter\HTTP\ResponseInterface;
 

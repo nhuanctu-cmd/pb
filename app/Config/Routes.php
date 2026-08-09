@@ -9,6 +9,10 @@ $routes->get('/', 'Home::index');
 $routes->get('/login', 'AuthController::login');
 $routes->post('/login', 'AuthController::loginPost');
 $routes->get('/logout', 'AuthController::logout');
+$routes->get('/forgot-password', 'AuthController::forgotPassword');
+$routes->post('/forgot-password', 'AuthController::forgotPasswordPost');
+$routes->get('/reset-password/(:any)', 'AuthController::resetPassword/$1');
+$routes->post('/reset-password', 'AuthController::resetPasswordPost');
 $routes->get('/locale/switch/(:any)', 'AuthController::switchLocale/$1');
 $routes->get('/live-scores', 'LiveScores::index', ['namespace' => 'App\Controllers\Public']);
 $routes->get('/live-scores/bracket', 'LiveScores::bracket', ['namespace' => 'App\Controllers\Public']);
@@ -333,6 +337,37 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
             $routes->post('lock/(:num)', 'TournamentSchedulerController::lock/$1');
             $routes->post('unlock/(:num)', 'TournamentSchedulerController::unlock/$1');
             $routes->post('team-group', 'TournamentSchedulerController::moveTeam');
+        });
+
+        // POS routes (quầy bán hàng)
+        $routes->group('pos', function ($routes) {
+            $routes->get('/', 'PosController::index');
+            $routes->get('counter', 'PosController::index');
+            $routes->get('getOrder/(:num)', 'PosController::getOrder/$1');
+            $routes->post('addItem/(:num)', 'PosController::addItem/$1');
+            $routes->post('removeItem/(:num)/(:num)', 'PosController::removeItem/$1/$2');
+            $routes->post('updateItem/(:num)', 'PosController::updateItem/$1');
+            $routes->post('attachBooking/(:num)', 'PosController::attachBooking/$1');
+            $routes->post('attachPlayer/(:num)', 'PosController::attachPlayer/$1');
+            $routes->get('searchProducts/(:num)', 'PosController::searchProducts/$1');
+            $routes->get('searchBookings', 'PosController::searchBookings');
+            $routes->get('searchPlayers', 'PosController::searchPlayers');
+            $routes->post('checkout/(:num)', 'PosController::checkout/$1');
+            $routes->post('cancel/(:num)', 'PosController::cancel/$1');
+        });
+
+        // Payment routes (hóa đơn & thanh toán)
+        $routes->group('payments', function ($routes) {
+            $routes->get('/', 'PaymentController::index');
+            $routes->get('detail/(:num)', 'PaymentController::detail/$1');
+            $routes->post('create-booking-invoice/(:num)', 'PaymentController::createBookingInvoice/$1');
+            $routes->post('pay-cash/(:num)', 'PaymentController::payCash/$1');
+            $routes->post('create-bank-qr/(:num)', 'PaymentController::createBankQr/$1');
+            $routes->post('confirm-bank-payment/(:num)', 'PaymentController::confirmBankPayment/$1');
+            $routes->post('refund/(:num)', 'PaymentController::refund/$1');
+            $routes->post('cancel/(:num)', 'PaymentController::cancel/$1');
+            $routes->get('qr-config', 'PaymentController::qrConfig');
+            $routes->post('save-qr-config', 'PaymentController::saveQrConfig');
         });
 
         // Audit logs routes

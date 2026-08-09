@@ -49,7 +49,7 @@
 | # | Module | Trạng thái |
 |---|--------|-----------|
 | M0 | Hạ tầng chạy (env/migrate/seed/git) | ✅ **HOÀN THÀNH** (09/08/2026) |
-| M1 | Core: Tenant + Auth + RBAC + SaaS Plan | ⬜ |
+| M1 | Core: Tenant + Auth + RBAC + SaaS Plan | ✅ **HOÀN THÀNH** (09/08/2026) |
 | M2 | Common: Settings + Media + Audit + Notification Engine | ⬜ |
 | M3 | Facility (cụm sân/chi nhánh/sân/giá) | ⬜ |
 | M4 | Booking hoàn chỉnh | ⬜ |

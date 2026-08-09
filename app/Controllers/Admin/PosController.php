@@ -32,11 +32,11 @@ class PosController extends BaseController
         $tenantId = session()->get('tenant_id');
         $branchId = session()->get('branch_id');
 
-        // Create new order
+        // Create new order (view dùng dạng mảng)
         $order = $this->posService->createOrder($tenantId, $branchId, session()->get('user_id'));
 
         $data = [
-            'order' => $order,
+            'order' => is_object($order) ? $order->toRawArray() : $order,
             'categories' => $this->posService->getCategoriesWithProducts($tenantId, $branchId),
         ];
 
@@ -251,11 +251,11 @@ class PosController extends BaseController
         $players = $this->playerModel
             ->where('tenant_id', $tenantId)
             ->groupStart()
-                ->like('fullname', $keyword)
+                ->like('full_name', $keyword)
                 ->orLike('phone', $keyword)
                 ->orLike('email', $keyword)
             ->groupEnd()
-            ->orderBy('fullname', 'ASC')
+            ->orderBy('full_name', 'ASC')
             ->limit(20)
             ->findAll();
 

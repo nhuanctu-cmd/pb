@@ -112,9 +112,12 @@
                                     <label class="form-label"><?= lang('Auth.password') ?></label>
                                     <input type="password" name="password" class="form-control form-control-lg" placeholder="••••••••" required>
                                 </div>
-                                <div class="mb-3 form-check">
-                                    <input type="checkbox" class="form-check-input" name="remember" id="remember">
-                                    <label class="form-check-label" for="remember"><?= lang('Auth.rememberMe') ?></label>
+                                <div class="mb-3 d-flex justify-content-between align-items-center">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" name="remember" id="remember">
+                                        <label class="form-check-label" for="remember"><?= lang('Auth.rememberMe') ?></label>
+                                    </div>
+                                    <a href="/forgot-password" class="text-decoration-none"><?= lang('Auth.forgotPassword') ?></a>
                                 </div>
                                 <button type="submit" class="btn btn-login w-100 btn-lg"><?= lang('Auth.login') ?></button>
                             </form>

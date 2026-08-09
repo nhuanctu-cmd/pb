@@ -9,7 +9,7 @@ class PosOrderItemModel extends Model
     protected $table            = 'pos_order_items';
     protected $primaryKey       = 'id';
     protected $useAutoIncrement = true;
-    protected $returnType       = \App\Entities\PosOrderItem::class;
+    protected $returnType       = 'array';
     protected $useSoftDeletes   = false;
     protected $allowedFields    = ['tenant_id', 'order_id', 'product_id', 'quantity', 'price', 'total'];
     protected $useTimestamps    = false;

@@ -32,4 +32,29 @@ return [
     'roleOwner'        => 'Court Owner',
     'roleManager'      => 'Branch Manager',
     'roleStaff'        => 'Staff',
+
+    // Brute-force protection
+    'loginLocked'        => 'Too many failed attempts. Please try again in {0} minutes.',
+    'loginAttemptsLeft'  => 'You have {0} attempt(s) left.',
+
+    // Forgot / reset password
+    'forgotPasswordTitle'    => 'Forgot password',
+    'forgotPasswordSubtitle' => 'Enter your email to receive a password reset link',
+    'sendResetLink'          => 'Send reset link',
+    'backToLogin'            => '← Back to login',
+    'resetEmailSent'         => 'If the email exists, a reset link has been sent. Please check your inbox.',
+    'resetPasswordTitle'     => 'Reset password',
+    'resetPasswordSubtitle'  => 'Enter a new password for your account',
+    'resetPassword'          => 'Reset password',
+    'passwordMinHint'        => 'Minimum 6 characters, must not match your last 3 passwords.',
+    'resetTokenInvalid'      => 'The reset link is invalid or has expired.',
+    'resetSuccess'           => 'Password reset successfully. Please login with your new password.',
+    'resetFailed'            => 'Password reset failed. Please try again.',
+    'passwordReused'         => 'New password must not match your last 3 passwords.',
+
+    // Reset email
+    'resetEmailSubject'  => 'Reset your password',
+    'resetEmailGreeting' => 'Hello,',
+    'resetEmailBody'     => 'We received a password reset request for your account. The link is valid for {0} minutes:',
+    'resetEmailIgnore'   => 'If you did not request this, please ignore this email. Your account remains secure.',
 ];

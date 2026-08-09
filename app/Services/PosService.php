@@ -22,7 +22,7 @@ class PosService
     protected ProductCategoryModel $categoryModel;
     protected InventoryService $inventoryService;
 
-    private ?PosOrder $currentOrder = null;
+    private ?array $currentOrder = null;
 
     public function __construct()
     {
@@ -38,7 +38,7 @@ class PosService
     /**
      * Create new order
      */
-    public function createOrder(int $tenantId, int $branchId, ?int $userId = null): PosOrder
+    public function createOrder(int $tenantId, int $branchId, ?int $userId = null): array
     {
         $orderCode = $this->generateOrderCode($tenantId, $branchId);
 
@@ -65,7 +65,7 @@ class PosService
     /**
      * Get current order
      */
-    public function getCurrentOrder(): ?PosOrder
+    public function getCurrentOrder(): ?array
     {
         return $this->currentOrder;
     }
@@ -73,7 +73,7 @@ class PosService
     /**
      * Load existing order
      */
-    public function loadOrder(int $orderId): ?PosOrder
+    public function loadOrder(int $orderId): ?array
     {
         $this->currentOrder = $this->orderModel->find($orderId);
         return $this->currentOrder;
@@ -480,7 +480,7 @@ class PosService
                 ->findAll();
 
             if (!empty($products)) {
-                $category->products = $products;
+                $category['products'] = $products;
                 $result[] = $category;
             }
         }

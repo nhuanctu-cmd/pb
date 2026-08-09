@@ -60,15 +60,16 @@ class TeamsController extends BaseController
 
     public function show($id)
     {
-        $team = $this->teamModel->find($id);
-        if (! $team || (int) $team->tenant_id !== (int) session('tenant_id')) {
+        $tenantId = (int) session('tenant_id');
+        $team = $tenantId ? $this->teamModel->findForTenant((int) $id, $tenantId) : null;
+        if (! $team) {
             return redirect()->to('/player/teams')->with('error', 'Không tìm thấy team.');
         }
 
         return view('player/teams/show', [
             'team' => $team,
-            'members' => $this->teamMemberModel->getByTeam((int) $id),
-            'players' => model(PlayerModel::class)->getByTenant((int) session('tenant_id'), ['status' => 'active']),
+            'members' => $this->teamMemberModel->getByTeam((int) $id, $tenantId),
+            'players' => model(PlayerModel::class)->getByTenant($tenantId, ['status' => 'active']),
         ]);
     }
 

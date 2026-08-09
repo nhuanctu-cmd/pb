@@ -6,13 +6,13 @@
     <title><?= esc($pageTitle ?? 'Admin') ?> | <?= esc(lang('App.app_name')) ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="/assets/css/app.css" rel="stylesheet">
-    <link href="/assets/css/admin-layout.css" rel="stylesheet">
-    <link href="/assets/css/components.css" rel="stylesheet">
-    <link href="/assets/css/erp-table.css" rel="stylesheet">
-    <link href="/assets/css/forms.css" rel="stylesheet">
-    <link href="/assets/css/dashboard.css" rel="stylesheet">
-    <link href="/assets/css/mobile.css" rel="stylesheet">
+    <link href="<?= esc(asset_url('assets/css/app.css')) ?>" rel="stylesheet">
+    <link href="<?= esc(asset_url('assets/css/admin-layout.css')) ?>" rel="stylesheet">
+    <link href="<?= esc(asset_url('assets/css/components.css')) ?>" rel="stylesheet">
+    <link href="<?= esc(asset_url('assets/css/erp-table.css')) ?>" rel="stylesheet">
+    <link href="<?= esc(asset_url('assets/css/forms.css')) ?>" rel="stylesheet">
+    <link href="<?= esc(asset_url('assets/css/dashboard.css')) ?>" rel="stylesheet">
+    <link href="<?= esc(asset_url('assets/css/mobile.css')) ?>" rel="stylesheet">
     <?= $this->renderSection('styles') ?>
 </head>
 <body class="erp-body">
@@ -38,8 +38,8 @@
 
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="/assets/js/app.js"></script>
-    <script src="/assets/js/admin-ui.js"></script>
+    <script src="<?= esc(asset_url('assets/js/app.js')) ?>"></script>
+    <script src="<?= esc(asset_url('assets/js/admin-ui.js')) ?>"></script>
     <?= $this->renderSection('scripts') ?>
 </body>
 </html>

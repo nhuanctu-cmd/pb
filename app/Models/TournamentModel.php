@@ -35,7 +35,7 @@ class TournamentModel extends Model
     public function getByTenant(int $tenantId, array $filters = []): array
     {
         $builder = $this->select('tournaments.*, branches.name as branch_name')
-            ->join('branches', 'branches.id = tournaments.branch_id', 'left')
+            ->join('branches', 'branches.id = tournaments.branch_id AND branches.tenant_id = tournaments.tenant_id', 'left')
             ->where('tournaments.tenant_id', $tenantId)
             ->where('tournaments.deleted_at', null);
 
@@ -58,7 +58,7 @@ class TournamentModel extends Model
     public function findBySlug(string $slug): ?object
     {
         return $this->select('tournaments.*, branches.name as branch_name, branches.address as branch_address')
-            ->join('branches', 'branches.id = tournaments.branch_id', 'left')
+            ->join('branches', 'branches.id = tournaments.branch_id AND branches.tenant_id = tournaments.tenant_id', 'left')
             ->where('tournaments.deleted_at', null)
             ->groupStart()
                 ->where('tournaments.slug_vi', $slug)
@@ -94,5 +94,22 @@ class TournamentModel extends Model
         }
 
         return $builder->countAllResults() > 0;
+    }
+
+    public function findForTenant(int $tournamentId, int $tenantId): ?object
+    {
+        return $this->where('id', $tournamentId)
+            ->where('tenant_id', $tenantId)
+            ->where('deleted_at', null)
+            ->first();
+    }
+
+    public function findForUpdate(int $tournamentId, int $tenantId): ?object
+    {
+        $row = $this->db->query(
+            'SELECT * FROM tournaments WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL LIMIT 1 FOR UPDATE',
+            [$tournamentId, $tenantId]
+        )->getRowArray();
+        return $row ? (object) $row : null;
     }
 }

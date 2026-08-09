@@ -53,7 +53,8 @@ class AuthApi extends BaseController
     public function refresh()
     {
         $userId = $this->request->api_user_id ?? null;
-        $user = $userId ? $this->userModel->find((int) $userId) : null;
+        $tenantId = (int) ($this->request->api_tenant_id ?? 0);
+        $user = $userId && $tenantId ? $this->userModel->findForTenant((int) $userId, $tenantId) : null;
         if (!$user) {
             return service('apiResponseService')->unauthorized();
         }

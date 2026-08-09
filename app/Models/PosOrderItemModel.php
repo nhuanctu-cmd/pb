@@ -11,7 +11,7 @@ class PosOrderItemModel extends Model
     protected $useAutoIncrement = true;
     protected $returnType       = 'array';
     protected $useSoftDeletes   = false;
-    protected $allowedFields    = ['tenant_id', 'order_id', 'product_id', 'quantity', 'price', 'total'];
+    protected $allowedFields    = ['tenant_id', 'order_id', 'product_id', 'quantity', 'price', 'total', 'created_at'];
     protected $useTimestamps    = false;
     protected $createdField     = 'created_at';
     protected $updatedField     = 'updated_at';
@@ -25,12 +25,15 @@ class PosOrderItemModel extends Model
         'total'      => 'required|decimal',
     ];
 
-    public function getByOrder(int $orderId)
+    public function getByOrder(int $orderId, ?int $tenantId = null)
     {
-        return $this->select('pos_order_items.*, products.name_vi, products.unit, products.image, product_categories.name_vi as category_name')
+        $builder = $this->select('pos_order_items.*, products.name_vi, products.unit, products.image, product_categories.name_vi as category_name')
             ->join('products', 'products.id = pos_order_items.product_id')
             ->join('product_categories', 'product_categories.id = products.category_id')
-            ->where('pos_order_items.order_id', $orderId)
-            ->findAll();
+            ->where('pos_order_items.order_id', $orderId);
+        if ($tenantId !== null) {
+            $builder->where('pos_order_items.tenant_id', $tenantId);
+        }
+        return $builder->findAll();
     }
 }

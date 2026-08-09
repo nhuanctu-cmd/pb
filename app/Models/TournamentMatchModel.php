@@ -17,4 +17,9 @@ class TournamentMatchModel extends Model
     ];
     protected $useTimestamps = true;
     protected $dateFormat = 'datetime';
+
+    public function findForTenant(int $matchId, int $tenantId): ?object
+    {
+        return $this->where('id', $matchId)->where('tenant_id', $tenantId)->first();
+    }
 }

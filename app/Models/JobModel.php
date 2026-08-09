@@ -27,9 +27,15 @@ class JobModel extends Model
 
     public function push(string $queue, array $payload, int $delaySeconds = 0, int $maxAttempts = 3): int
     {
+        $queue = trim($queue);
+        $maxAttempts = max(1, $maxAttempts);
+        if ($queue === '') {
+            return 0;
+        }
+
         return (int) $this->insert([
             'queue'        => $queue,
-            'payload'      => json_encode($payload),
+            'payload'      => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             'attempts'     => 0,
             'max_attempts' => $maxAttempts,
             'available_at' => date('Y-m-d H:i:s', time() + $delaySeconds),
@@ -40,25 +46,36 @@ class JobModel extends Model
     public function reserve(string $queue = 'default', int $limit = 10): array
     {
         $now = date('Y-m-d H:i:s');
-        $jobs = $this->where('queue', $queue)
-                     ->where('reserved_at', null)
-                     ->where('failed_at', null)
-                     ->where('available_at <=', $now)
-                     ->where('attempts < max_attempts', null, false)
-                     ->orderBy('created_at', 'ASC')
-                     ->limit($limit)
-                     ->findAll();
+        $limit = max(1, min(100, $limit));
+        $queue = trim($queue) ?: 'default';
 
-        if (! empty($jobs)) {
-            $ids = array_map(fn ($job) => $job->id, $jobs);
-            $this->whereIn('id', $ids)->set(['reserved_at' => $now])->update();
+        // Reservation must be an atomic claim. A plain SELECT followed by an
+        // UPDATE lets two workers receive the same email under load.
+        $this->db->transBegin();
+        $sql = 'SELECT * FROM jobs
+                WHERE queue = ?
+                  AND reserved_at IS NULL
+                  AND failed_at IS NULL
+                  AND available_at <= ?
+                  AND attempts < max_attempts
+                ORDER BY created_at ASC, id ASC
+                LIMIT ' . $limit . ' FOR UPDATE';
+        $jobs = $this->db->query($sql, [$queue, $now])->getResult();
 
-            // Return the reserved state to callers immediately as well as
-            // persisting it, so workers do not operate on stale job objects.
-            foreach ($jobs as $job) {
-                $job->reserved_at = $now;
-            }
+        foreach ($jobs as $job) {
+            $this->db->table($this->table)
+                ->where('id', $job->id)
+                ->where('reserved_at', null)
+                ->set(['reserved_at' => $now])
+                ->update();
+            $job->reserved_at = $now;
         }
+
+        if (!$this->db->transStatus()) {
+            $this->db->transRollback();
+            return [];
+        }
+        $this->db->transCommit();
 
         return $jobs;
     }
@@ -81,6 +98,7 @@ class JobModel extends Model
     {
         return $this->db->table('jobs')
                         ->where('id', $jobId)
+                        ->where('failed_at', null)
                         ->set('reserved_at', null)
                         ->set('attempts', 'attempts + 1', false)
                         ->update();

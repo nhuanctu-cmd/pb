@@ -42,7 +42,7 @@ class MembershipModel extends Model
     {
         $today = date('Y-m-d');
         $builder = $this->select('memberships.*, membership_packages.name_vi as package_name_vi, membership_packages.name_en as package_name_en, membership_packages.discount_percent, membership_packages.booking_priority')
-                        ->join('membership_packages', 'membership_packages.id = memberships.package_id', 'left')
+                        ->join('membership_packages', 'membership_packages.id = memberships.package_id AND membership_packages.tenant_id = memberships.tenant_id', 'left')
                         ->where('memberships.player_id', $playerId)
                         ->where('memberships.status', 'active')
                         ->where('memberships.start_date <=', $today)
@@ -56,21 +56,36 @@ class MembershipModel extends Model
         return $builder->orderBy('memberships.end_date', 'DESC')->first();
     }
 
-    public function getByPlayer(int $playerId)
+    public function getByPlayer(int $playerId, ?int $tenantId = null)
     {
-        return $this->select('memberships.*, membership_packages.name_vi as package_name_vi, membership_packages.name_en as package_name_en')
-                    ->join('membership_packages', 'membership_packages.id = memberships.package_id', 'left')
+        $builder = $this->select('memberships.*, membership_packages.name_vi as package_name_vi, membership_packages.name_en as package_name_en')
+                    ->join('membership_packages', 'membership_packages.id = memberships.package_id AND membership_packages.tenant_id = memberships.tenant_id', 'left')
                     ->where('memberships.player_id', $playerId)
-                    ->where('memberships.deleted_at', null)
-                    ->orderBy('memberships.created_at', 'DESC')
-                    ->findAll();
+                    ->where('memberships.deleted_at', null);
+        if ($tenantId !== null) {
+            $builder->where('memberships.tenant_id', $tenantId);
+        }
+        return $builder->orderBy('memberships.created_at', 'DESC')->findAll();
+    }
+
+    public function findForUpdate(int $membershipId, ?int $tenantId = null): ?\App\Entities\Membership
+    {
+        $sql = 'SELECT * FROM memberships WHERE id = ? AND deleted_at IS NULL';
+        $params = [$membershipId];
+        if ($tenantId !== null) {
+            $sql .= ' AND tenant_id = ?';
+            $params[] = $tenantId;
+        }
+        $sql .= ' LIMIT 1 FOR UPDATE';
+        $row = $this->db->query($sql, $params)->getRowArray();
+        return $row ? new \App\Entities\Membership($row) : null;
     }
 
     public function getByTenant(int $tenantId, array $filters = [])
     {
         $builder = $this->select('memberships.*, players.full_name, players.player_code, players.phone, membership_packages.name_vi as package_name_vi, membership_packages.name_en as package_name_en')
                         ->join('players', 'players.id = memberships.player_id')
-                        ->join('membership_packages', 'membership_packages.id = memberships.package_id')
+                        ->join('membership_packages', 'membership_packages.id = memberships.package_id AND membership_packages.tenant_id = memberships.tenant_id')
                         ->where('memberships.tenant_id', $tenantId)
                         ->where('memberships.deleted_at', null);
 

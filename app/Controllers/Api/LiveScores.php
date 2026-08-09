@@ -37,7 +37,11 @@ class LiveScores extends BaseController
         }
 
         $json = $this->request->getJSON(true) ?: [];
-        return $this->response->setJSON(service('scoreService')->updateScore($matchId, $json['sets'] ?? $this->request->getPost('sets') ?? []));
+        return $this->response->setJSON(service('scoreService')->updateScore(
+            $matchId,
+            $json['sets'] ?? $this->request->getPost('sets') ?? [],
+            $this->tenantId()
+        ));
     }
 
     protected function tenantId(): ?int

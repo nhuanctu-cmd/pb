@@ -49,6 +49,14 @@ class CourtDeviceModel extends Model
             ->findAll();
     }
 
+    public function findForTenant(int $deviceId, int $tenantId): ?object
+    {
+        return $this->where('id', $deviceId)
+            ->where('tenant_id', $tenantId)
+            ->where('deleted_at', null)
+            ->first();
+    }
+
     public function getOnlineDevices(int $branchId): array
     {
         return $this->where('branch_id', $branchId)

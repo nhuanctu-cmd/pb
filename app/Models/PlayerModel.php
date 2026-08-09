@@ -149,6 +149,14 @@ class PlayerModel extends Model
                     ->first();
     }
 
+    public function findForTenant(int $playerId, int $tenantId): ?\App\Entities\Player
+    {
+        return $this->where('id', $playerId)
+            ->where('tenant_id', $tenantId)
+            ->where('deleted_at', null)
+            ->first();
+    }
+
     public function getRegions(int $tenantId): array
     {
         $rows = $this->select('region')

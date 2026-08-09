@@ -68,7 +68,15 @@ class CourtImageModel extends Model
         return $this->where('court_id', $courtId)
                     ->where('is_primary', 1)
                     ->where('deleted_at', null)
-                    ->first();
+            ->first();
+    }
+
+    public function findForTenant(int $imageId, int $tenantId): ?object
+    {
+        return $this->where('id', $imageId)
+            ->where('tenant_id', $tenantId)
+            ->where('deleted_at', null)
+            ->first();
     }
 
     public function resetPrimary(int $courtId)

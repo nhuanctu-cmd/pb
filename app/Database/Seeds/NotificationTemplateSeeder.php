@@ -70,6 +70,42 @@ class NotificationTemplateSeeder extends Seeder
             ],
             'variables' => ['booking_code', 'court_name', 'start_time'],
         ],
+        [
+            'code'      => 'coaching_player_approved',
+            'channel'   => 'in_app',
+            'locales'   => [
+                'vi' => ['subject' => 'Coaching đã được duyệt', 'body' => 'Bạn đã được duyệt vào session {{session_title}}.'],
+                'en' => ['subject' => 'Coaching approved', 'body' => 'You were approved for {{session_title}}.'],
+            ],
+            'variables' => ['full_name', 'session_title'],
+        ],
+        [
+            'code'      => 'ladder_challenge_received',
+            'channel'   => 'in_app',
+            'locales'   => [
+                'vi' => ['subject' => 'Bạn nhận được ladder challenge', 'body' => '{{challenger_name}} đã thách đấu bạn trong {{event_name}}.'],
+                'en' => ['subject' => 'New ladder challenge', 'body' => '{{challenger_name}} challenged you in {{event_name}}.'],
+            ],
+            'variables' => ['challenger_name', 'event_name'],
+        ],
+        [
+            'code'      => 'ladder_challenge_accepted',
+            'channel'   => 'in_app',
+            'locales'   => [
+                'vi' => ['subject' => 'Ladder challenge được chấp nhận', 'body' => '{{opponent_name}} đã chấp nhận challenge của bạn.'],
+                'en' => ['subject' => 'Ladder challenge accepted', 'body' => '{{opponent_name}} accepted your challenge.'],
+            ],
+            'variables' => ['opponent_name'],
+        ],
+        [
+            'code'      => 'ladder_challenge_rejected',
+            'channel'   => 'in_app',
+            'locales'   => [
+                'vi' => ['subject' => 'Ladder challenge bị từ chối', 'body' => '{{opponent_name}} đã từ chối challenge của bạn.'],
+                'en' => ['subject' => 'Ladder challenge rejected', 'body' => '{{opponent_name}} rejected your challenge.'],
+            ],
+            'variables' => ['opponent_name'],
+        ],
     ];
 
     public function run()

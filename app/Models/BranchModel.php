@@ -71,4 +71,22 @@ class BranchModel extends Model
                     ->where('deleted_at', null)
                     ->first();
     }
+
+    public function findForTenant(int $branchId, int $tenantId): ?object
+    {
+        return $this->where('id', $branchId)
+            ->where('tenant_id', $tenantId)
+            ->where('deleted_at', null)
+            ->first();
+    }
+
+    public function getByFacilityForTenant(int $facilityId, int $tenantId): array
+    {
+        return $this->where('facility_id', $facilityId)
+            ->where('tenant_id', $tenantId)
+            ->where('deleted_at', null)
+            ->orderBy('branch_type', 'ASC')
+            ->orderBy('name', 'ASC')
+            ->findAll();
+    }
 }

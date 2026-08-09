@@ -58,4 +58,14 @@ class PlayerWalletModel extends Model
     {
         return $this->update($walletId, ['balance' => $newBalance]);
     }
+
+    public function findForUpdate(int $playerId, int $tenantId): ?\App\Entities\PlayerWallet
+    {
+        $row = $this->db->query(
+            'SELECT * FROM player_wallets WHERE player_id = ? AND tenant_id = ? LIMIT 1 FOR UPDATE',
+            [$playerId, $tenantId]
+        )->getRowArray();
+
+        return $row ? new \App\Entities\PlayerWallet($row) : null;
+    }
 }

@@ -44,4 +44,9 @@ class ClubModel extends Model
 
         return $builder->orderBy('name_vi', 'ASC')->findAll();
     }
+
+    public function findForTenant(int $clubId, int $tenantId): ?object
+    {
+        return $this->where('id', $clubId)->where('tenant_id', $tenantId)->where('deleted_at', null)->first();
+    }
 }

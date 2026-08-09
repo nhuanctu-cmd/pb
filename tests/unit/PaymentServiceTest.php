@@ -12,12 +12,16 @@ class PaymentServiceTest extends CIUnitTestCase
     private InvoiceService $invoiceService;
     private PaymentService $paymentService;
     private array $invoiceIds = [];
+    private string $invoiceCodePrefix = 'UT-PAY-';
+    private float $initialWalletBalance = 0;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->invoiceService = new InvoiceService();
         $this->paymentService = new PaymentService();
+        $this->initialWalletBalance = (float) (\Config\Database::connect()->table('player_wallets')
+            ->where('tenant_id', 1)->where('player_id', 1)->get()->getRow('balance') ?? 0);
     }
 
     protected function tearDown(): void
@@ -28,6 +32,19 @@ class PaymentServiceTest extends CIUnitTestCase
             $db->table('payments')->whereIn('invoice_id', $this->invoiceIds)->delete();
             $db->table('invoices')->whereIn('id', $this->invoiceIds)->delete();
         }
+        // Also clean rows created before an exception occurred between the
+        // insert and the test fixture receiving the generated ID.
+        $orphanIds = $db->table('invoices')->select('id')
+            ->like('invoice_code', $this->invoiceCodePrefix, 'after')
+            ->get()->getResultArray();
+        $orphanIds = array_column($orphanIds, 'id');
+        if ($orphanIds !== []) {
+            $db->table('refunds')->whereIn('invoice_id', $orphanIds)->delete();
+            $db->table('payments')->whereIn('invoice_id', $orphanIds)->delete();
+            $db->table('invoices')->whereIn('id', $orphanIds)->delete();
+        }
+        $db->table('player_wallets')->where('tenant_id', 1)->where('player_id', 1)
+            ->update(['balance' => $this->initialWalletBalance]);
         parent::tearDown();
     }
 
@@ -73,14 +90,27 @@ class PaymentServiceTest extends CIUnitTestCase
         $this->assertSame('refunded', $final['new_status']);
     }
 
-    private function createInvoice(float $amount)
+    public function testWalletPaymentDebitsWalletAndInvoiceTogether(): void
+    {
+        $invoice = $this->createInvoice(1000, 1);
+        $result = $this->paymentService->payByWallet($invoice->id, 1000, 1, [
+            'idempotency_key' => 'payment-wallet-' . $invoice->id,
+        ], 1);
+
+        $this->assertTrue($result['success']);
+        $wallet = \Config\Database::connect()->table('player_wallets')
+            ->where('tenant_id', 1)->where('player_id', 1)->get()->getRow();
+        $this->assertSame(round($this->initialWalletBalance - 1000, 2), round((float) $wallet->balance, 2));
+    }
+
+    private function createInvoice(float $amount, ?int $playerId = null)
     {
         $invoice = $this->invoiceService->createInvoice(
             1,
             2,
-            'UT-PAY-' . bin2hex(random_bytes(5)),
+            $this->invoiceCodePrefix . bin2hex(random_bytes(5)),
             $amount,
-            ['created_by' => 2]
+            ['created_by' => 2, 'player_id' => $playerId, 'customer_type' => $playerId ? 'player' : 'guest']
         );
         $this->invoiceIds[] = (int) $invoice->id;
 

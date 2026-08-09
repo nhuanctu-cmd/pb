@@ -56,4 +56,21 @@ class MatchRequestModel extends Model
             ->orderBy('match_requests.preferred_start_time', 'ASC')
             ->findAll();
     }
+
+    public function findForTenant(int $requestId, int $tenantId): ?object
+    {
+        return $this->where('id', $requestId)
+            ->where('tenant_id', $tenantId)
+            ->where('deleted_at', null)
+            ->first();
+    }
+
+    public function findForUpdate(int $requestId, int $tenantId): ?object
+    {
+        $row = $this->db->query(
+            'SELECT * FROM match_requests WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL LIMIT 1 FOR UPDATE',
+            [$requestId, $tenantId]
+        )->getRowArray();
+        return $row ? (object) $row : null;
+    }
 }

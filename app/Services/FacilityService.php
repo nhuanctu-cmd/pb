@@ -95,7 +95,10 @@ class FacilityService
         $facility = $this->facilityModel->find($facilityId);
         if (!$facility) return [];
 
-        $branches = $this->branchModel->where('facility_id', $facilityId)->findAll();
+        $branches = $this->branchModel->where('facility_id', $facilityId)
+            ->where('tenant_id', $facility->tenant_id)
+            ->where('deleted_at', null)
+            ->findAll();
         $branchIds = array_column($branches, 'id');
         if (empty($branchIds)) {
             return [
@@ -940,6 +943,11 @@ class FacilityService
 
     public function getRevenueByCourt(int $branchId, string $fromDate, string $toDate): array
     {
+        $branch = $this->branchModel->find($branchId);
+        if (!$branch) {
+            return [];
+        }
+
         return model('BookingItemModel')
             ->select('booking_items.court_id, courts.code, courts.name_vi, courts.name_en,
                       COUNT(DISTINCT booking_items.booking_id) as booking_count,
@@ -947,6 +955,11 @@ class FacilityService
             ->join('courts', 'courts.id = booking_items.court_id')
             ->join('bookings', 'bookings.id = booking_items.booking_id')
             ->where('bookings.branch_id', $branchId)
+            ->where('bookings.tenant_id', $branch->tenant_id)
+            ->where('courts.branch_id', $branchId)
+            ->where('courts.tenant_id', $branch->tenant_id)
+            ->where('booking_items.status', 'active')
+            ->where('bookings.deleted_at', null)
             ->where('DATE(bookings.booking_date) >=', $fromDate)
             ->where('DATE(bookings.booking_date) <=', $toDate)
             ->whereIn('bookings.status', ['completed', 'checked_in', 'paid'])

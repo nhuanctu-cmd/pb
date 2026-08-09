@@ -36,4 +36,18 @@ class SocialMatchModel extends Model
             ->orderBy('social_matches.start_time', 'ASC')
             ->findAll();
     }
+
+    public function findForTenant(int $matchId, int $tenantId): ?object
+    {
+        return $this->where('id', $matchId)
+            ->where('tenant_id', $tenantId)
+            ->where('deleted_at', null)
+            ->first();
+    }
+
+    public function findForUpdate(int $matchId, int $tenantId): ?object
+    {
+        $row = $this->db->query('SELECT * FROM social_matches WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL LIMIT 1 FOR UPDATE', [$matchId, $tenantId])->getRowArray();
+        return $row ? (object) $row : null;
+    }
 }

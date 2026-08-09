@@ -27,14 +27,15 @@ class DashboardController extends BaseController
 
         $upcomingBookings = $this->bookingModel
             ->where('player_id', $playerId)
+            ->where('tenant_id', $tenantId)
             ->where('start_time >=', date('Y-m-d H:i:s'))
             ->where('status', 'confirmed')
             ->orderBy('start_time', 'ASC')
             ->limit(3)
             ->findAll();
 
-        $wallet = $this->walletModel->where('player_id', $playerId)->first();
-        $stats = $this->statModel->where('player_id', $playerId)->first();
+        $wallet = $this->walletModel->where('player_id', $playerId)->where('tenant_id', $tenantId)->first();
+        $stats = $this->statModel->where('player_id', $playerId)->where('tenant_id', $tenantId)->first();
 
         $data = [
             'showBack' => false,

@@ -36,7 +36,7 @@ class PricingService
 
         $durationMinutes = $this->calculateDuration($startTime, $endTime);
         $hours = max(0.25, $durationMinutes / 60);
-        $isMember = $this->isActiveMember($playerId);
+        $isMember = $this->isActiveMember($playerId, $tenantId);
         $rules = $this->pricingRuleModel->getApplicableRules($tenantId, $branchId, $court->court_type_id ?? null, $courtId);
         $matchedRules = $this->getMatchedRules($rules, [
             'tenant_id' => $tenantId,
@@ -296,13 +296,13 @@ class PricingService
         return in_array(substr($date, 5), ['01-01', '04-30', '05-01', '09-02'], true);
     }
 
-    private function isActiveMember(?int $playerId): bool
+    private function isActiveMember(?int $playerId, ?int $tenantId = null): bool
     {
         if (! $playerId) {
             return false;
         }
 
-        return $this->membershipModel->getActiveByPlayer($playerId) !== null;
+        return $this->membershipModel->getActiveByPlayer($playerId, $tenantId) !== null;
     }
 
     private function calculateDuration(string $startTime, string $endTime): int

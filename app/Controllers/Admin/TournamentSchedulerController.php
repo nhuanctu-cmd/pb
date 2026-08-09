@@ -4,19 +4,31 @@ namespace App\Controllers\Admin;
 
 use App\Controllers\BaseController;
 use App\Services\TournamentSchedulerService;
+use App\Models\TournamentCategoryModel;
+use App\Models\TournamentMatchModel;
+use App\Models\TournamentGroupModel;
 
 class TournamentSchedulerController extends BaseController
 {
     private TournamentSchedulerService $scheduler;
+    private TournamentCategoryModel $categoryModel;
+    private TournamentMatchModel $matchModel;
+    private TournamentGroupModel $groupModel;
 
     public function __construct()
     {
         $this->scheduler = new TournamentSchedulerService();
+        $this->categoryModel = new TournamentCategoryModel();
+        $this->matchModel = new TournamentMatchModel();
+        $this->groupModel = new TournamentGroupModel();
     }
 
     public function index()
     {
         $categoryId = (int) ($this->request->getGet('category_id') ?? 0);
+        if ($categoryId && !$this->categoryForTenant($categoryId)) {
+            $categoryId = 0;
+        }
         $this->viewData['pageTitle'] = 'Điều phối giải';
         $this->viewData['categoryId'] = $categoryId;
         $this->viewData['groups'] = $categoryId ? $this->scheduler->getGroupsWithTeams($categoryId) : [];
@@ -32,6 +44,9 @@ class TournamentSchedulerController extends BaseController
         $groups = (int) ($this->request->getPost('groups') ?: 2);
         if (! $categoryId) {
             return redirect()->back()->with('error', 'Vui lòng nhập category_id.');
+        }
+        if (!$this->categoryForTenant($categoryId)) {
+            return redirect()->back()->with('error', 'Không tìm thấy nội dung thuộc tenant hiện tại.');
         }
 
         $createdGroups = $this->scheduler->generateGroups($categoryId, $groups);
@@ -52,6 +67,9 @@ class TournamentSchedulerController extends BaseController
         if (! $categoryId) {
             return redirect()->back()->with('error', 'Vui lòng nhập category_id.');
         }
+        if (!$this->categoryForTenant($categoryId)) {
+            return redirect()->back()->with('error', 'Không tìm thấy nội dung thuộc tenant hiện tại.');
+        }
 
         $this->scheduler->rerunUnlockedSchedule($categoryId);
 
@@ -60,12 +78,18 @@ class TournamentSchedulerController extends BaseController
 
     public function lock(int $id)
     {
+        if (!$this->matchForTenant($id)) {
+            return redirect()->back()->with('error', 'Không tìm thấy trận đấu.');
+        }
         $this->scheduler->lockMatch($id);
         return redirect()->back()->with('success', 'Đã khóa trận.');
     }
 
     public function unlock(int $id)
     {
+        if (!$this->matchForTenant($id)) {
+            return redirect()->back()->with('error', 'Không tìm thấy trận đấu.');
+        }
         $this->scheduler->unlockMatch($id);
         return redirect()->back()->with('success', 'Đã mở khóa trận.');
     }
@@ -74,8 +98,22 @@ class TournamentSchedulerController extends BaseController
     {
         $teamId = (int) $this->request->getPost('team_id');
         $groupId = (int) $this->request->getPost('group_id');
-        $success = $teamId && $groupId && $this->scheduler->moveTeamToGroup($teamId, $groupId);
+        $tenantId = (int) current_tenant_id();
+        $group = $tenantId ? $this->groupModel->where('id', $groupId)->where('tenant_id', $tenantId)->first() : null;
+        $success = $teamId && $group && $this->scheduler->moveTeamToGroup($teamId, $groupId);
 
         return $this->response->setJSON(['success' => $success]);
+    }
+
+    private function categoryForTenant(int $categoryId): ?object
+    {
+        $tenantId = (int) current_tenant_id();
+        return $tenantId ? $this->categoryModel->findForTenant($categoryId, $tenantId) : null;
+    }
+
+    private function matchForTenant(int $matchId): ?object
+    {
+        $tenantId = (int) current_tenant_id();
+        return $tenantId ? $this->matchModel->findForTenant($matchId, $tenantId) : null;
     }
 }

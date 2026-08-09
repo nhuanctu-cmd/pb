@@ -7,6 +7,7 @@ use App\Models\BookingItemModel;
 use App\Models\BookingQrCodeModel;
 use App\Models\BookingLogModel;
 use App\Models\CourtModel;
+use App\Models\PlayerModel;
 
 class BookingService
 {
@@ -52,6 +53,10 @@ class BookingService
 
         $db = \Config\Database::connect();
         $db->transStart();
+        if (!empty($data['player_id']) && !(new PlayerModel())->findPlayerByUser((int) $data['player_id'], $tenantId)) {
+            $db->transRollback();
+            return ['success' => false, 'message' => 'Player không thuộc tenant hiện tại.'];
+        }
         $requestedIntervals = [];
 
         // Lock each court row before the final availability check. Concurrent
@@ -129,6 +134,9 @@ class BookingService
             'payment_status'  => 'unpaid',
             'source'          => $data['source'] ?? 'admin',
             'note'            => $data['note'] ?? null,
+            'is_recurring'    => (int) ($data['is_recurring'] ?? 0),
+            'recurring_pattern' => $data['recurring_pattern'] ?? null,
+            'recurring_parent_id' => $data['recurring_parent_id'] ?? null,
             'expires_at'      => $expiresAt,
             'hold_until'      => $data['hold_until'] ?? null,
             'is_hold'         => (int) ($data['is_hold'] ?? 0),
@@ -194,9 +202,22 @@ class BookingService
             ]);
         }
 
-        $depositAmount = $totalAmount * ($depositPercent / 100);
+        $discountAmount = 0.0;
+        if (!empty($data['promotion_code'])) {
+            $promotionPlayer = !empty($data['player_id']) ? (new PlayerModel())->findPlayerByUser((int) $data['player_id'], $tenantId) : null;
+            $promotionResult = service('growthService')->redeem((string) $data['promotion_code'], $totalAmount, $tenantId, $promotionPlayer ? (int) $promotionPlayer->id : null, (int) $bookingId, $data['promotion_idempotency_key'] ?? ('booking-' . $bookingId));
+            if (empty($promotionResult['success'])) {
+                $db->transRollback();
+                return $promotionResult;
+            }
+            $discountAmount = (float) ($promotionResult['discount_amount'] ?? 0);
+        }
+        $netAmount = round(max(0, $totalAmount - $discountAmount), 2);
+        $depositAmount = $netAmount * ($depositPercent / 100);
         $this->bookingModel->update($bookingId, [
-            'total_amount'    => $totalAmount,
+            'total_amount'    => $netAmount,
+            'discount_amount' => $discountAmount,
+            'net_amount'      => $netAmount,
             'deposit_amount'  => $depositAmount,
             'pricing_rule_id' => $selectedRuleIds[0] ?? null,
             'price_breakdown' => json_encode($priceBreakdown, JSON_UNESCAPED_UNICODE),
@@ -791,7 +812,10 @@ class BookingService
             ->where('deleted_at', null)
             ->groupStart()
                 ->where('start_time <', $endAt)
-                ->where('end_time >', $startAt)
+                ->groupStart()
+                    ->where('end_time IS NULL', null, false)
+                    ->orWhere('end_time >', $startAt)
+                ->groupEnd()
             ->groupEnd()
             ->first();
 
@@ -889,7 +913,10 @@ class BookingService
         $maintenances = $maintenanceModel->where('court_id', $courtId)
                                          ->where('status !=', 'completed')
                                          ->where('start_time <=', $date . ' 23:59:59')
-                                         ->where('end_time >=', $date . ' 00:00:00')
+                                         ->groupStart()
+                                            ->where('end_time IS NULL', null, false)
+                                            ->orWhere('end_time >=', $date . ' 00:00:00')
+                                         ->groupEnd()
                                          ->findAll();
 
         // Get existing bookings for this date
@@ -955,5 +982,110 @@ class BookingService
         }
 
         return $slots;
+    }
+
+    /**
+     * Return a booking-oriented availability matrix for one week.
+     *
+     * The matrix deliberately keeps the slot list per day because opening
+     * hours, holidays and maintenance can make the list differ by date.
+     */
+    public function getWeeklyAvailability(int $branchId, string $weekStart, ?int $tenantId = null, int $slotDurationMinutes = 60): array
+    {
+        $week = \DateTimeImmutable::createFromFormat('!Y-m-d', $weekStart);
+        if (! $week || $week->format('Y-m-d') !== $weekStart) {
+            throw new \InvalidArgumentException('Invalid week start date.');
+        }
+
+        $week = $week->modify('monday this week');
+        $courts = $this->courtModel
+            ->where('branch_id', $branchId)
+            ->where('deleted_at', null)
+            ->where('status !=', 'inactive')
+            ->orderBy('floor', 'ASC')
+            ->orderBy('sort_order', 'ASC')
+            ->orderBy('code', 'ASC')
+            ->findAll();
+
+        if ($tenantId !== null) {
+            $courts = array_values(array_filter($courts, static fn ($court) => (int) $court->tenant_id === $tenantId));
+        }
+
+        $courtData = [];
+        foreach ($courts as $index => $court) {
+            $courtData[] = [
+                'id'           => (int) $court->id,
+                'code'         => $court->code,
+                'name'         => $court->getName(),
+                'floor'        => (int) ($court->floor ?? 1),
+                'status'       => $court->status,
+                'status_label' => $court->status === 'available' ? 'Sẵn sàng' : ($court->status === 'maintenance' ? 'Bảo trì' : 'Đang sử dụng'),
+                'coordinates_x'=> (int) ($court->coordinates_x ?: 40 + (($index % 4) * 210)),
+                'coordinates_y'=> (int) ($court->coordinates_y ?: 40 + (intdiv($index, 4) * 145)),
+                'rotation'     => (int) ($court->rotation ?? 0),
+                'color_scheme' => $court->color_scheme ?: 'green',
+                'is_bookable'  => $court->status === 'available',
+            ];
+        }
+
+        $days = [];
+        foreach (range(0, 6) as $offset) {
+            $date = $week->modify('+' . $offset . ' days')->format('Y-m-d');
+            $slotsByKey = [];
+            $availabilityByCourt = [];
+
+            foreach ($courts as $court) {
+                $courtSlots = $this->getAvailableSlots((int) $court->id, $date, $slotDurationMinutes, $tenantId);
+                $availabilityByCourt[(int) $court->id] = [];
+
+                foreach ($courtSlots as $slot) {
+                    $key = $slot['start_time'] . '|' . $slot['end_time'];
+                    $slotsByKey[$key] = [
+                        'start_time' => $slot['start_time'],
+                        'end_time'   => $slot['end_time'],
+                    ];
+                    $availabilityByCourt[(int) $court->id][$key] = [
+                        'available'      => (bool) $slot['available'] && $court->status === 'available',
+                        'is_booked'      => (bool) $slot['is_booked'],
+                        'is_maintenance'=> (bool) $slot['is_maintenance'] || $court->status === 'maintenance',
+                    ];
+                }
+            }
+
+            ksort($slotsByKey);
+            $slots = [];
+            foreach ($slotsByKey as $key => $slot) {
+                $byCourt = [];
+                foreach ($courts as $court) {
+                    $byCourt[(string) $court->id] = $availabilityByCourt[(int) $court->id][$key] ?? [
+                        'available' => false,
+                        'is_booked' => false,
+                        'is_maintenance' => true,
+                    ];
+                }
+
+                $slots[] = [
+                    'start_time' => $slot['start_time'],
+                    'end_time'   => $slot['end_time'],
+                    'by_court'   => $byCourt,
+                ];
+            }
+
+            $dateObject = $week->modify('+' . $offset . ' days');
+            $days[] = [
+                'date'       => $date,
+                'day_number' => (int) $dateObject->format('d'),
+                'weekday'    => ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][(int) $dateObject->format('w')],
+                'is_today'   => $date === date('Y-m-d'),
+                'slots'      => $slots,
+            ];
+        }
+
+        return [
+            'week_start' => $week->format('Y-m-d'),
+            'week_end'   => $week->modify('+6 days')->format('Y-m-d'),
+            'courts'     => $courtData,
+            'days'       => $days,
+        ];
     }
 }

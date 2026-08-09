@@ -58,6 +58,9 @@ class BookingApi extends BaseController
         }
 
         $tenantId = $this->request->api_tenant_id ?? current_tenant_id();
+        if (!$tenantId) {
+            return $this->response->setJSON(['success' => false, 'message' => 'tenant_id là bắt buộc']);
+        }
         $slots = $this->bookingService->getAvailableSlots(
             (int) $courtId, $date, 60, $tenantId ? (int) $tenantId : null
         );
@@ -76,6 +79,10 @@ class BookingApi extends BaseController
     {
         $tenantId = $this->request->api_tenant_id ?? $this->request->getPost('tenant_id') ?? session()->get('tenant_id');
         $branchId = $this->request->getPost('branch_id');
+
+        if (!$tenantId) {
+            return $this->response->setJSON(['success' => false, 'message' => 'tenant_id là bắt buộc']);
+        }
 
         if (!$branchId) {
             return $this->response->setJSON([
@@ -134,7 +141,7 @@ class BookingApi extends BaseController
             ]);
         }
 
-        $items = model(BookingItemModel::class)->getByBooking($id);
+        $items = model(BookingItemModel::class)->getByBooking($id, (int) $tenantId);
 
         return $this->response->setJSON([
             'success' => true,
@@ -155,6 +162,9 @@ class BookingApi extends BaseController
         $userId = $this->request->getPost('user_id');
 
         $tenantId = $this->request->api_tenant_id ?? current_tenant_id();
+        if (!$tenantId) {
+            return $this->response->setJSON(['success' => false, 'message' => 'tenant_id là bắt buộc']);
+        }
         $result = $this->bookingService->cancelBooking(
             (int) $id, $reason, $userId ? (int) $userId : null,
             $tenantId ? (int) $tenantId : null
@@ -179,7 +189,12 @@ class BookingApi extends BaseController
             ]);
         }
 
-        $tenantId = $this->request->api_tenant_id ?? current_tenant_id();
+        $tenantId = $this->request->api_tenant_id
+            ?? $this->request->getPost('tenant_id')
+            ?? current_tenant_id();
+        if (!$tenantId) {
+            return $this->response->setJSON(['success' => false, 'message' => 'tenant_id là bắt buộc']);
+        }
         $result = $this->bookingService->checkInByQr(
             $token, $userId ? (int) $userId : null,
             $tenantId ? (int) $tenantId : null

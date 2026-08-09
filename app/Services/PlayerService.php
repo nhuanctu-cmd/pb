@@ -65,9 +65,13 @@ class PlayerService
         return $this->playerModel->update($id, $data);
     }
 
-    public function getPlayerById(int $id)
+    public function getPlayerById(int $id, ?int $tenantId = null)
     {
-        return $this->playerModel->find($id);
+        $builder = $this->playerModel->where('id', $id);
+        if ($tenantId !== null) {
+            $builder->where('tenant_id', $tenantId);
+        }
+        return $builder->first();
     }
 
     public function getProfile(int $playerId)

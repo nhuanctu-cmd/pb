@@ -16,6 +16,7 @@ class PaymentService
     protected InvoiceModel $invoiceModel;
     protected RefundModel $refundModel;
     protected PaymentQrConfigModel $qrConfigModel;
+    protected WalletService $walletService;
 
     public function __construct()
     {
@@ -23,6 +24,7 @@ class PaymentService
         $this->invoiceModel = new InvoiceModel();
         $this->refundModel = new RefundModel();
         $this->qrConfigModel = new PaymentQrConfigModel();
+        $this->walletService = new WalletService();
     }
 
     /**
@@ -47,8 +49,6 @@ class PaymentService
      */
     public function payByWallet(int $invoiceId, float $amount, int $playerId, array $data = [], ?int $tenantId = null): array
     {
-        // TODO: Integrate with WalletService
-        // For now, just process as regular payment
         return $this->processPayment($invoiceId, $amount, 'wallet', array_merge($data, ['player_id' => $playerId]), $tenantId);
     }
 
@@ -347,6 +347,24 @@ class PaymentService
             $remaining = round((float) $invoice->total_amount - (float) $invoice->paid_amount, 2);
             if ($amount > $remaining) {
                 throw new \InvalidArgumentException('Payment exceeds invoice balance');
+            }
+
+            if ($method === 'wallet') {
+                $playerId = (int) ($data['player_id'] ?? 0);
+                if ($playerId <= 0 || ($invoice->player_id !== null && (int) $invoice->player_id !== $playerId)) {
+                    throw new \InvalidArgumentException('Wallet payer does not match invoice player');
+                }
+                if (! $this->walletService->pay(
+                    $playerId,
+                    (int) $invoice->tenant_id,
+                    $amount,
+                    'Payment for invoice ' . $invoice->invoice_code,
+                    'invoice',
+                    $invoiceId,
+                    $data['created_by'] ?? null
+                )) {
+                    throw new \InvalidArgumentException('Insufficient wallet balance');
+                }
             }
 
             // Generate payment code

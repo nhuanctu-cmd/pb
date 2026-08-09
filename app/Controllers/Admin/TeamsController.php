@@ -19,16 +19,21 @@ class TeamsController extends BaseController
 
     public function show($id)
     {
-        $team = model(TeamModel::class)->find($id);
+        $tenantId = (int) session('tenant_id');
+        $team = $tenantId ? model(TeamModel::class)->findForTenant((int) $id, $tenantId) : null;
         return $this->render('admin/teams/show', [
             'pageTitle' => $team ? $team->team_name : 'Team',
             'team' => $team,
-            'members' => model(TeamMemberModel::class)->getByTeam((int) $id),
+            'members' => model(TeamMemberModel::class)->getByTeam((int) $id, $tenantId),
         ]);
     }
 
     public function status($id)
     {
+        $tenantId = (int) session('tenant_id');
+        if (!$tenantId || !model(TeamModel::class)->findForTenant((int) $id, $tenantId)) {
+            return redirect()->back()->with('error', 'Không tìm thấy team.');
+        }
         model(TeamModel::class)->update($id, ['status' => $this->request->getPost('status') ?: 'inactive']);
         return redirect()->back()->with('success', 'Đã cập nhật trạng thái team.');
     }

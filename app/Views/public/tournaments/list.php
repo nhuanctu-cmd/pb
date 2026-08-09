@@ -30,7 +30,7 @@
         <?php foreach ($tournaments as $tournament): ?>
             <div class="col-md-6 col-xl-4">
                 <article class="tournament-card">
-                    <img src="<?= esc($tournament->banner ?: '/assets/img/tournament-fallback.png') ?>" alt="<?= esc($tournament->name_vi) ?>">
+                    <img src="<?= esc($tournament->banner ?: asset_url('assets/img/tournament-fallback.png')) ?>" alt="<?= esc($tournament->name_vi) ?>">
                     <div class="card-body">
                         <span class="badge badge-soft mb-2"><?= esc($tournament->status) ?></span>
                         <h2 class="h5"><?= esc(($current_locale ?? 'vi') === 'en' && $tournament->name_en ? $tournament->name_en : $tournament->name_vi) ?></h2>

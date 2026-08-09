@@ -5,6 +5,7 @@ namespace App\Controllers\Admin;
 use App\Controllers\BaseController;
 use App\Models\BranchModel;
 use App\Models\FacilityModel;
+use App\Models\CourtDeviceModel;
 use App\Services\FacilityService;
 
 class FacilitiesController extends BaseController
@@ -12,12 +13,14 @@ class FacilitiesController extends BaseController
     protected FacilityModel $facilityModel;
     protected BranchModel $branchModel;
     protected FacilityService $facilityService;
+    protected CourtDeviceModel $deviceModel;
 
     public function __construct()
     {
         $this->facilityModel = new FacilityModel();
         $this->branchModel = new BranchModel();
         $this->facilityService = new FacilityService();
+        $this->deviceModel = new CourtDeviceModel();
     }
 
     public function index()
@@ -74,7 +77,7 @@ class FacilitiesController extends BaseController
 
     public function edit(int $id)
     {
-        $facility = $this->facilityModel->find($id);
+        $facility = $this->findTenantFacility($id);
         if (!$facility) {
             return redirect()->to('/admin/facilities')->with('error', lang('App.no_data'));
         }
@@ -87,7 +90,7 @@ class FacilitiesController extends BaseController
 
     public function update(int $id)
     {
-        $facility = $this->facilityModel->find($id);
+        $facility = $this->findTenantFacility($id);
         if (!$facility) {
             return redirect()->to('/admin/facilities')->with('error', lang('App.no_data'));
         }
@@ -119,13 +122,16 @@ class FacilitiesController extends BaseController
 
     public function delete(int $id)
     {
+        if (!$this->findTenantFacility($id)) {
+            return redirect()->to('/admin/facilities')->with('error', lang('App.no_data'));
+        }
         $this->facilityModel->delete($id);
         return redirect()->to('/admin/facilities')->with('success', lang('App.deleted_success'));
     }
 
     public function dashboard(int $id)
     {
-        $facility = $this->facilityModel->find($id);
+        $facility = $this->findTenantFacility($id);
         if (!$facility) {
             return redirect()->to('/admin/facilities')->with('error', lang('App.no_data'));
         }
@@ -167,7 +173,8 @@ class FacilitiesController extends BaseController
 
     public function devices(int $branchId)
     {
-        $branch = $this->branchModel->find($branchId);
+        $tenantId = current_tenant_id();
+        $branch = $tenantId ? $this->branchModel->findForTenant($branchId, (int) $tenantId) : null;
         if (!$branch) {
             return redirect()->to('/admin/facilities')->with('error', lang('App.no_data'));
         }
@@ -182,7 +189,17 @@ class FacilitiesController extends BaseController
 
     public function toggleDevice(int $deviceId)
     {
+        $tenantId = current_tenant_id();
+        if (!$tenantId || !$this->deviceModel->findForTenant($deviceId, (int) $tenantId)) {
+            return redirect()->back()->with('error', lang('App.no_data'));
+        }
         $this->facilityService->toggleDevice($deviceId);
         return redirect()->back()->with('success', lang('App.updated_success'));
+    }
+
+    private function findTenantFacility(int $id): ?object
+    {
+        $tenantId = current_tenant_id();
+        return $tenantId ? $this->facilityModel->findForTenant($id, (int) $tenantId) : null;
     }
 }

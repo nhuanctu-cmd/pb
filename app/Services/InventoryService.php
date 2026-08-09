@@ -63,11 +63,7 @@ class InventoryService
 
         try {
             // Get current inventory
-            $inventory = $this->inventoryModel
-                ->where('tenant_id', $tenantId)
-                ->where('branch_id', $branchId)
-                ->where('product_id', $productId)
-                ->first();
+            $inventory = $this->inventoryModel->findForUpdate($tenantId, $branchId, $productId);
 
             $beforeQty = $inventory ? (int)$inventory['quantity'] : 0;
             $afterQty = $beforeQty + $quantity;
@@ -119,11 +115,7 @@ class InventoryService
         $db->transStart();
 
         try {
-            $inventory = $this->inventoryModel
-                ->where('tenant_id', $tenantId)
-                ->where('branch_id', $branchId)
-                ->where('product_id', $productId)
-                ->first();
+            $inventory = $this->inventoryModel->findForUpdate($tenantId, $branchId, $productId);
 
             if (!$inventory) {
                 throw new DatabaseException('Inventory not found for product: ' . $productId);
@@ -175,11 +167,7 @@ class InventoryService
         $db->transStart();
 
         try {
-            $inventory = $this->inventoryModel
-                ->where('tenant_id', $tenantId)
-                ->where('branch_id', $branchId)
-                ->where('product_id', $productId)
-                ->first();
+            $inventory = $this->inventoryModel->findForUpdate($tenantId, $branchId, $productId);
 
             $beforeQty = $inventory ? (int)$inventory['quantity'] : 0;
             $afterQty = $beforeQty + $quantity;
@@ -226,11 +214,7 @@ class InventoryService
         $db->transStart();
 
         try {
-            $inventory = $this->inventoryModel
-                ->where('tenant_id', $tenantId)
-                ->where('branch_id', $branchId)
-                ->where('product_id', $productId)
-                ->first();
+            $inventory = $this->inventoryModel->findForUpdate($tenantId, $branchId, $productId);
 
             $beforeQty = $inventory ? (int)$inventory['quantity'] : 0;
             $afterQty = $newQuantity;

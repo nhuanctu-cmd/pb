@@ -21,21 +21,26 @@ class TournamentRegistrationModel extends Model
     protected $updatedField = 'updated_at';
     protected $deletedField = 'deleted_at';
 
-    public function getByTournament(int $tournamentId): array
+    public function getByTournament(int $tournamentId, ?int $tenantId = null): array
     {
-        return $this->select('tournament_registrations.*, tournament_categories.name_vi as category_name')
-            ->join('tournament_categories', 'tournament_categories.id = tournament_registrations.category_id', 'left')
+        $builder = $this->select('tournament_registrations.*, tournament_categories.name_vi as category_name')
+            ->join('tournament_categories', 'tournament_categories.id = tournament_registrations.category_id AND tournament_categories.tenant_id = tournament_registrations.tenant_id', 'left')
             ->where('tournament_registrations.tournament_id', $tournamentId)
-            ->where('tournament_registrations.deleted_at', null)
-            ->orderBy('tournament_registrations.created_at', 'DESC')
-            ->findAll();
+            ->where('tournament_registrations.deleted_at', null);
+        if ($tenantId !== null) {
+            $builder->where('tournament_registrations.tenant_id', $tenantId);
+        }
+        return $builder->orderBy('tournament_registrations.created_at', 'DESC')->findAll();
     }
 
-    public function countApprovedByCategory(int $categoryId): int
+    public function countApprovedByCategory(int $categoryId, ?int $tenantId = null): int
     {
-        return $this->where('category_id', $categoryId)
+        $builder = $this->where('category_id', $categoryId)
             ->where('approval_status', 'approved')
-            ->where('deleted_at', null)
-            ->countAllResults();
+            ->where('deleted_at', null);
+        if ($tenantId !== null) {
+            $builder->where('tenant_id', $tenantId);
+        }
+        return $builder->countAllResults();
     }
 }

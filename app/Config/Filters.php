@@ -30,6 +30,7 @@ class Filters extends BaseFilters
         'permission'    => \App\Filters\PermissionFilter::class,
         'plan'          => \App\Filters\PlanFilter::class,
         'apiauth'       => \App\Filters\ApiAuthFilter::class,
+        'apiratelimit'  => \App\Filters\ApiRateLimitFilter::class,
     ];
 
     public array $required = [
@@ -59,6 +60,9 @@ class Filters extends BaseFilters
     public array $methods = [];
 
     public array $filters = [
+        'apiratelimit' => [
+            'before' => ['api/*'],
+        ],
         'auth' => [
             'before' => [
                 'admin/*',

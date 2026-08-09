@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title><?= $this->renderSection('title') ?> - Pickleball</title>
     <link rel="manifest" href="/manifest.json">
-    <link rel="apple-touch-icon" href="/assets/player/icons/icon-192.png">
+    <link rel="apple-touch-icon" href="<?= esc(asset_url('assets/player/icons/icon-192.png')) ?>">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -375,9 +375,9 @@
             <i class="bi bi-house-door"></i>
             <span>Trang chủ</span>
         </a>
-        <a href="/player/bookings" class="<?= strpos(current_url(), 'player/bookings') !== false ? 'active' : '' ?>">
-            <i class="bi bi-calendar-check"></i>
-            <span>Lịch</span>
+        <a href="/player/bookings/create" class="<?= strpos(current_url(), 'player/bookings/create') !== false ? 'active' : '' ?>">
+            <i class="bi bi-plus-circle"></i>
+            <span>Đặt sân</span>
         </a>
         <a href="/player/tournaments" class="<?= strpos(current_url(), 'player/tournaments') !== false ? 'active' : '' ?>">
             <i class="bi bi-trophy"></i>
@@ -394,7 +394,7 @@
     </nav>
 
     <!-- FAB -->
-    <button class="fab" onclick="location.href='/player/booking/create'" id="fabBtn">
+    <button class="fab" onclick="location.href='/player/bookings/create'" id="fabBtn">
         <i class="bi bi-plus-lg"></i>
     </button>
 

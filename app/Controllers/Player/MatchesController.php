@@ -59,8 +59,9 @@ class MatchesController extends BaseController
 
     public function show($id)
     {
-        $request = $this->matchRequestModel->find($id);
-        if (! $request || (int) $request->tenant_id !== (int) session('tenant_id')) {
+        $tenantId = (int) session('tenant_id');
+        $request = $tenantId ? $this->matchRequestModel->findForTenant((int) $id, $tenantId) : null;
+        if (! $request) {
             return redirect()->to('/player/matches')->with('error', 'Không tìm thấy kèo.');
         }
 

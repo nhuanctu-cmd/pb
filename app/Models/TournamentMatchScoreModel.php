@@ -16,8 +16,12 @@ class TournamentMatchScoreModel extends Model
     protected $createdField = 'created_at';
     protected $updatedField = 'updated_at';
 
-    public function getByMatch(int $matchId): array
+    public function getByMatch(int $matchId, ?int $tenantId = null): array
     {
-        return $this->where('match_id', $matchId)->orderBy('set_no', 'ASC')->findAll();
+        $builder = $this->where('match_id', $matchId);
+        if ($tenantId !== null) {
+            $builder->where('tenant_id', $tenantId);
+        }
+        return $builder->orderBy('set_no', 'ASC')->findAll();
     }
 }

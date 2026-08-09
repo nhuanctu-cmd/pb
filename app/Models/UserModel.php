@@ -95,4 +95,12 @@ class UserModel extends Model
                     ->where('deleted_at', null)
                     ->findAll();
     }
+
+    public function findForTenant(int $userId, int $tenantId): ?object
+    {
+        return $this->where('id', $userId)
+            ->where('tenant_id', $tenantId)
+            ->where('deleted_at', null)
+            ->first();
+    }
 }

@@ -26,7 +26,12 @@ class BranchApi extends BaseController
 
     public function show(int $id)
     {
-        $branch = $this->branchModel->find($id);
+        $tenantId = (int) ($this->request->getGet('tenant_id') ?? $this->request->api_tenant_id ?? current_tenant_id() ?? 0);
+        if ($tenantId <= 0) {
+            return service('apiResponseService')->validationError(['tenant_id' => lang('Validation.required', ['field' => 'tenant_id'])]);
+        }
+
+        $branch = $this->branchModel->findForTenant($id, $tenantId);
         if (!$branch) {
             return service('apiResponseService')->notFound();
         }

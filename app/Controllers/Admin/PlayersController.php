@@ -103,14 +103,14 @@ class PlayersController extends BaseController
 
     public function edit(int $id)
     {
-        $player = $this->playerService->getPlayerById($id);
+        $player = $this->playerService->getPlayerById($id, (int) current_tenant_id());
         if (!$player) {
             return redirect()->to('/admin/players')->with('error', lang('App.no_data'));
         }
 
         $this->viewData['pageTitle'] = lang('App.edit_player');
         $this->viewData['player']    = $player;
-        $this->viewData['memberships'] = $this->membershipService->getPlayerMemberships($id);
+        $this->viewData['memberships'] = $this->membershipService->getPlayerMemberships($id, (int) current_tenant_id());
         $this->viewData['transactions'] = $this->walletService->getPlayerTransactions($id, $player->tenant_id, 20);
         $this->viewData['branches']  = model(\App\Models\BranchModel::class)->getByTenant($player->tenant_id);
 
@@ -138,7 +138,7 @@ class PlayersController extends BaseController
 
     public function checkIn(int $id)
     {
-        $player = $this->playerService->getPlayerById($id);
+        $player = $this->playerService->getPlayerById($id, (int) current_tenant_id());
         if (!$player) {
             return redirect()->to('/admin/players')->with('error', lang('App.no_data'));
         }
@@ -152,7 +152,7 @@ class PlayersController extends BaseController
 
     public function update(int $id)
     {
-        $player = $this->playerService->getPlayerById($id);
+        $player = $this->playerService->getPlayerById($id, (int) current_tenant_id());
         if (!$player) {
             return redirect()->to('/admin/players')->with('error', lang('App.no_data'));
         }
@@ -193,7 +193,7 @@ class PlayersController extends BaseController
 
     public function delete(int $id)
     {
-        $player = $this->playerService->getPlayerById($id);
+        $player = $this->playerService->getPlayerById($id, (int) current_tenant_id());
         if (!$player) {
             return redirect()->to('/admin/players')->with('error', lang('App.no_data'));
         }
@@ -208,7 +208,7 @@ class PlayersController extends BaseController
 
     public function wallet(int $id)
     {
-        $player = $this->playerService->getPlayerById($id);
+        $player = $this->playerService->getPlayerById($id, (int) current_tenant_id());
         if (!$player) {
             return redirect()->to('/admin/players')->with('error', lang('App.no_data'));
         }
@@ -223,7 +223,7 @@ class PlayersController extends BaseController
 
     public function topup(int $id)
     {
-        $player = $this->playerService->getPlayerById($id);
+        $player = $this->playerService->getPlayerById($id, (int) current_tenant_id());
         if (!$player) {
             return redirect()->to('/admin/players')->with('error', lang('App.no_data'));
         }
@@ -244,7 +244,7 @@ class PlayersController extends BaseController
 
     public function adjustWallet(int $id)
     {
-        $player = $this->playerService->getPlayerById($id);
+        $player = $this->playerService->getPlayerById($id, (int) current_tenant_id());
         if (!$player) {
             return redirect()->to('/admin/players')->with('error', lang('App.no_data'));
         }
@@ -265,7 +265,7 @@ class PlayersController extends BaseController
 
     public function bookingHistory(int $id)
     {
-        $player = $this->playerService->getPlayerById($id);
+        $player = $this->playerService->getPlayerById($id, (int) current_tenant_id());
         if (!$player) {
             return redirect()->to('/admin/players')->with('error', lang('App.no_data'));
         }
@@ -304,7 +304,7 @@ class PlayersController extends BaseController
 
     public function matchHistory(int $id)
     {
-        $player = $this->playerService->getPlayerById($id);
+        $player = $this->playerService->getPlayerById($id, (int) current_tenant_id());
         if (!$player) {
             return redirect()->to('/admin/players')->with('error', lang('App.no_data'));
         }
@@ -320,7 +320,7 @@ class PlayersController extends BaseController
 
     public function storeMatch(int $id)
     {
-        $player = $this->playerService->getPlayerById($id);
+        $player = $this->playerService->getPlayerById($id, (int) current_tenant_id());
         if (!$player) {
             return redirect()->to('/admin/players')->with('error', lang('App.no_data'));
         }

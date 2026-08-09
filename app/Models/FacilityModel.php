@@ -51,4 +51,12 @@ class FacilityModel extends Model
 
         return $builder->orderBy('sort_order', 'ASC')->orderBy('name_vi', 'ASC')->findAll();
     }
+
+    public function findForTenant(int $facilityId, int $tenantId): ?object
+    {
+        return $this->where('id', $facilityId)
+            ->where('tenant_id', $tenantId)
+            ->where('deleted_at', null)
+            ->first();
+    }
 }

@@ -27,6 +27,7 @@ class BranchController extends BaseController
         $courtCounts = [];
         foreach ($branches as $branch) {
             $courtCounts[$branch->id] = $courtModel->where('branch_id', $branch->id)
+                                                   ->where('tenant_id', $tenantId)
                                                    ->where('deleted_at', null)
                                                    ->countAllResults();
         }
@@ -250,24 +251,25 @@ class BranchController extends BaseController
 
     public function deleteHoliday(int $id, int $holidayId)
     {
-        (new BranchHolidayModel())->delete($holidayId);
+        $branch = $this->findTenantBranch($id);
+        if (!$branch) {
+            return redirect()->to('/admin/branches')->with('error', lang('App.not_found'));
+        }
+
+        $holidayModel = new BranchHolidayModel();
+        if (!$holidayModel->findForTenant($holidayId, $id, (int) $branch->tenant_id)) {
+            return redirect()->to('/admin/branches/holidays/' . $id)->with('error', lang('App.not_found'));
+        }
+        $holidayModel->delete($holidayId);
 
         return redirect()->to('/admin/branches/holidays/' . $id)->with('success', lang('App.deleted_success'));
     }
 
     private function findTenantBranch(int $id): ?object
     {
-        $branch = $this->branchModel->find($id);
         $tenantId = session('tenant_id');
 
-        if (! $branch) {
-            return null;
-        }
-        if ($tenantId && (int) $branch->tenant_id !== (int) $tenantId && ! session('is_superadmin')) {
-            return null;
-        }
-
-        return $branch;
+        return $tenantId ? $this->branchModel->findForTenant($id, (int) $tenantId) : null;
     }
 
     private function collectData(int $tenantId): array

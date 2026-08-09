@@ -128,6 +128,22 @@ class CourtModel extends Model
                     ->findAll();
     }
 
+    public function findForTenant(int $courtId, int $tenantId): ?object
+    {
+        return $this->where('id', $courtId)
+            ->where('tenant_id', $tenantId)
+            ->where('deleted_at', null)
+            ->first();
+    }
+
+    public function belongsToTenant(int $courtId, int $tenantId): bool
+    {
+        return $this->where('id', $courtId)
+            ->where('tenant_id', $tenantId)
+            ->where('deleted_at', null)
+            ->countAllResults() === 1;
+    }
+
     public function isCodeUnique(string $code, int $branchId, ?int $excludeId = null): bool
     {
         $builder = $this->where('code', $code)

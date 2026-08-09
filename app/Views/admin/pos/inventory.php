@@ -1,3 +1,5 @@
+<?= $this->extend('layouts/admin_master') ?>
+<?= $this->section('content') ?>
 <!-- Inventory Management Page -->
 <div class="container-fluid">
     <div class="row mb-3">
@@ -211,3 +213,4 @@ $('#adjustForm').submit(function(e) {
     });
 });
 </script>
+<?= $this->endSection() ?>

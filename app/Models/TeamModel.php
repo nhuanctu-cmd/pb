@@ -48,4 +48,9 @@ class TeamModel extends Model
 
         return $builder->groupBy('teams.id')->orderBy('teams.created_at', 'DESC')->findAll();
     }
+
+    public function findForTenant(int $teamId, int $tenantId): ?object
+    {
+        return $this->where('id', $teamId)->where('tenant_id', $tenantId)->where('deleted_at', null)->first();
+    }
 }

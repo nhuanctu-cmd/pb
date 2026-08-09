@@ -11,7 +11,7 @@ class InventoryMovementModel extends Model
     protected $useAutoIncrement = true;
     protected $returnType       = 'array';
     protected $useSoftDeletes   = false;
-    protected $allowedFields    = ['tenant_id', 'branch_id', 'product_id', 'movement_type', 'quantity', 'before_qty', 'after_qty', 'ref_type', 'ref_id', 'note', 'created_by'];
+    protected $allowedFields    = ['tenant_id', 'branch_id', 'product_id', 'movement_type', 'quantity', 'before_qty', 'after_qty', 'ref_type', 'ref_id', 'note', 'created_by', 'created_at'];
     protected $useTimestamps    = false;
     protected $createdField     = 'created_at';
     protected $updatedField     = 'updated_at';

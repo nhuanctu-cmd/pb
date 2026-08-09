@@ -71,6 +71,106 @@ class Services extends CoreServices
         return new \App\Services\BookingService();
     }
 
+    public static function recurringBookingService(bool $getShared = true): \App\Services\RecurringBookingService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('recurringBookingService');
+        }
+        return new \App\Services\RecurringBookingService();
+    }
+
+    public static function bookingWaitlistService(bool $getShared = true): \App\Services\BookingWaitlistService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('bookingWaitlistService');
+        }
+        return new \App\Services\BookingWaitlistService();
+    }
+
+    public static function walkInService(bool $getShared = true): \App\Services\WalkInService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('walkInService');
+        }
+        return new \App\Services\WalkInService();
+    }
+
+    public static function operationsDashboardService(bool $getShared = true): \App\Services\OperationsDashboardService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('operationsDashboardService');
+        }
+        return new \App\Services\OperationsDashboardService();
+    }
+
+    public static function operationsReportService(bool $getShared = true): \App\Services\OperationsReportService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('operationsReportService');
+        }
+        return new \App\Services\OperationsReportService();
+    }
+
+    public static function openPlayService(bool $getShared = true): \App\Services\OpenPlayService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('openPlayService');
+        }
+        return new \App\Services\OpenPlayService();
+    }
+
+    public static function openPlayRotationService(bool $getShared = true): \App\Services\OpenPlayRotationService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('openPlayRotationService');
+        }
+        return new \App\Services\OpenPlayRotationService();
+    }
+
+    public static function socialGraphService(bool $getShared = true): \App\Services\SocialGraphService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('socialGraphService');
+        }
+        return new \App\Services\SocialGraphService();
+    }
+
+    public static function coachingService(bool $getShared = true): \App\Services\CoachingService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('coachingService');
+        }
+        return new \App\Services\CoachingService();
+    }
+
+    public static function competitionService(bool $getShared = true): \App\Services\CompetitionService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('competitionService');
+        }
+        return new \App\Services\CompetitionService();
+    }
+
+    public static function communityService(bool $getShared = true): \App\Services\CommunityService
+    {
+        if ($getShared) return static::getSharedInstance('communityService');
+        return new \App\Services\CommunityService();
+    }
+
+    public static function aiSchedulingService(bool $getShared = true): \App\Services\AiSchedulingService
+    {
+        if ($getShared) return static::getSharedInstance('aiSchedulingService');
+        return new \App\Services\AiSchedulingService();
+    }
+
+    public static function growthService(bool $getShared = true): \App\Services\GrowthService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('growthService');
+        }
+        return new \App\Services\GrowthService();
+    }
+
     public static function teamService(bool $getShared = true): \App\Services\TeamService
     {
         if ($getShared) {

@@ -4,15 +4,21 @@ namespace App\Controllers\Api;
 
 use CodeIgniter\RESTful\ResourceController;
 use App\Services\CourtService;
+use App\Models\BranchModel;
+use App\Models\CourtModel;
 
 class CourtApi extends ResourceController
 {
     protected CourtService $courtService;
+    protected BranchModel $branchModel;
+    protected CourtModel $courtModel;
     protected $format = 'json';
 
     public function __construct()
     {
         $this->courtService = new CourtService();
+        $this->branchModel = new BranchModel();
+        $this->courtModel = new CourtModel();
     }
 
     public function index()
@@ -27,6 +33,9 @@ class CourtApi extends ResourceController
         $status = $this->request->getGet('status');
 
         if ($branchId) {
+            if (!$this->branchModel->findForTenant((int) $branchId, (int) $tenantId)) {
+                return $this->failNotFound('Branch not found');
+            }
             $filters = [];
             if ($courtTypeId) $filters['court_type_id'] = $courtTypeId;
             if ($status) $filters['status'] = $status;
@@ -50,7 +59,11 @@ class CourtApi extends ResourceController
 
     public function show($id = null)
     {
-        $court = $this->courtService->getCourtById((int) $id);
+        $tenantId = (int) ($this->request->api_tenant_id ?? session('tenant_id'));
+        if (!$tenantId) {
+            return $this->failUnauthorized(lang('App.unauthorized'));
+        }
+        $court = $this->courtModel->findForTenant((int) $id, $tenantId);
         if (!$court) {
             return $this->failNotFound('Court not found');
         }
@@ -70,6 +83,10 @@ class CourtApi extends ResourceController
 
     public function getByBranch($branchId)
     {
+        $tenantId = (int) ($this->request->api_tenant_id ?? session('tenant_id'));
+        if (!$tenantId || !$this->branchModel->findForTenant((int) $branchId, $tenantId)) {
+            return $tenantId ? $this->failNotFound('Branch not found') : $this->failUnauthorized(lang('App.unauthorized'));
+        }
         $filters = [];
         $courtTypeId = $this->request->getGet('court_type_id');
         $status = $this->request->getGet('status');
@@ -94,6 +111,11 @@ class CourtApi extends ResourceController
 
         if (!$branchId) {
             return $this->failValidationError('branch_id là bắt buộc');
+        }
+
+        $tenantId = (int) ($this->request->api_tenant_id ?? session('tenant_id'));
+        if (!$tenantId || !$this->branchModel->findForTenant((int) $branchId, $tenantId)) {
+            return $tenantId ? $this->failNotFound('Branch not found') : $this->failUnauthorized(lang('App.unauthorized'));
         }
 
         $courts = $this->courtService->getAvailableCourts(

@@ -81,7 +81,7 @@ class ProfileController extends BaseController
             return redirect()->to('/player')->with('error', lang('App.no_data'));
         }
 
-        $memberships = $this->membershipService->getPlayerMemberships($player->id);
+        $memberships = $this->membershipService->getPlayerMemberships($player->id, $tenantId);
         $packages    = $this->membershipService->getPackages($tenantId);
         $active      = $this->membershipService->getActiveMembership($player->id, $tenantId);
 
@@ -126,8 +126,9 @@ class ProfileController extends BaseController
             return redirect()->to('/player')->with('error', lang('App.no_data'));
         }
 
-        $membership = model(\App\Models\MembershipModel::class)->find($id);
-        if ($membership && (int) $membership->player_id === (int) $player->id && $this->membershipService->cancel($id)) {
+        $membership = model(\App\Models\MembershipModel::class)
+            ->where('id', $id)->where('tenant_id', $tenantId)->where('player_id', $player->id)->first();
+        if ($membership && $this->membershipService->cancel($id, $tenantId)) {
             return redirect()->to('/player/profile/membership')->with('success', lang('App.membership_cancelled'));
         }
 

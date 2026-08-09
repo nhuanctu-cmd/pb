@@ -16,16 +16,22 @@ class TenantApi extends BaseController
 
     public function index()
     {
-        $tenants = $this->tenantModel->where('deleted_at', null)
-            ->orderBy('name', 'ASC')
-            ->findAll();
+        $tenantId = (int) ($this->request->api_tenant_id ?? current_tenant_id() ?? 0);
+        if ($tenantId <= 0) {
+            return service('apiResponseService')->validationError(['tenant_id' => 'tenant_id là bắt buộc']);
+        }
+        $tenants = $this->tenantModel->where('id', $tenantId)->where('deleted_at', null)->findAll();
 
         return service('apiResponseService')->success($tenants);
     }
 
     public function show(int $id)
     {
-        $tenant = $this->tenantModel->find($id);
+        $tenantId = (int) ($this->request->api_tenant_id ?? current_tenant_id() ?? 0);
+        if ($tenantId <= 0) {
+            return service('apiResponseService')->validationError(['tenant_id' => 'tenant_id là bắt buộc']);
+        }
+        $tenant = $this->tenantModel->where('id', $id)->where('id', $tenantId)->where('deleted_at', null)->first();
         if (!$tenant) {
             return service('apiResponseService')->notFound();
         }

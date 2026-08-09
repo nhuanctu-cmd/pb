@@ -27,7 +27,11 @@ class MatchRequestsController extends BaseController
 
     public function show($id)
     {
-        $request = model(MatchRequestModel::class)->find($id);
+        $tenantId = (int) session('tenant_id');
+        $request = $tenantId ? model(MatchRequestModel::class)->findForTenant((int) $id, $tenantId) : null;
+        if (!$request) {
+            return redirect()->to('/admin/matches')->with('error', 'Không tìm thấy kèo.');
+        }
         return $this->render('admin/matches/show', [
             'pageTitle' => 'Chi tiết kèo',
             'request' => $request,
@@ -37,14 +41,15 @@ class MatchRequestsController extends BaseController
 
     public function approve($id)
     {
-        $result = service('matchingService')->autoMatch((int) $id);
+        $result = service('matchingService')->autoMatch((int) $id, (int) session('tenant_id'));
         return redirect()->back()->with($result['success'] ? 'success' : 'error', $result['message']);
     }
 
     public function cancel($id)
     {
-        model(MatchRequestModel::class)->update($id, ['status' => 'cancelled']);
-        return redirect()->back()->with('success', 'Đã cancel kèo.');
+        $tenantId = (int) session('tenant_id');
+        $result = $tenantId ? service('matchingService')->cancelMatchRequest((int) $id, $tenantId, (int) session('user_id')) : ['success' => false, 'message' => 'Không tìm thấy kèo.'];
+        return redirect()->back()->with($result['success'] ? 'success' : 'error', $result['message']);
     }
 
     public function convert($socialMatchId)

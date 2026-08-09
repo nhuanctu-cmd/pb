@@ -56,11 +56,14 @@ class BookingItemModel extends Model
     /**
      * Get items by booking
      */
-    public function getByBooking(int $bookingId)
+    public function getByBooking(int $bookingId, ?int $tenantId = null)
     {
-        return $this->select('booking_items.*, courts.code as court_code, courts.name_vi as court_name_vi, courts.name_en as court_name_en')
+        $builder = $this->select('booking_items.*, courts.code as court_code, courts.name_vi as court_name_vi, courts.name_en as court_name_en')
                     ->join('courts', 'courts.id = booking_items.court_id', 'left')
-                    ->where('booking_items.booking_id', $bookingId)
-                    ->findAll();
+                    ->where('booking_items.booking_id', $bookingId);
+        if ($tenantId !== null) {
+            $builder->where('booking_items.tenant_id', $tenantId);
+        }
+        return $builder->findAll();
     }
 }

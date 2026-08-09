@@ -47,15 +47,24 @@ class ClubsController extends BaseController
 
     public function edit($id)
     {
+        $tenantId = (int) session('tenant_id');
+        $club = $tenantId ? $this->clubModel->findForTenant((int) $id, $tenantId) : null;
+        if (!$club) {
+            return redirect()->to('/admin/clubs')->with('error', 'Không tìm thấy club.');
+        }
         return $this->render('admin/clubs/form', [
             'pageTitle' => 'Cập nhật club',
-            'club' => $this->clubModel->find($id),
-            'players' => model(PlayerModel::class)->getByTenant((int) session('tenant_id'), ['status' => 'active']),
+            'club' => $club,
+            'players' => model(PlayerModel::class)->getByTenant($tenantId, ['status' => 'active']),
         ]);
     }
 
     public function update($id)
     {
+        $tenantId = (int) session('tenant_id');
+        if (!$tenantId || !$this->clubModel->findForTenant((int) $id, $tenantId)) {
+            return redirect()->to('/admin/clubs')->with('error', 'Không tìm thấy club.');
+        }
         $ok = $this->clubModel->update($id, $this->payload());
 
         return $ok
@@ -65,6 +74,10 @@ class ClubsController extends BaseController
 
     public function delete($id)
     {
+        $tenantId = (int) session('tenant_id');
+        if (!$tenantId || !$this->clubModel->findForTenant((int) $id, $tenantId)) {
+            return redirect()->to('/admin/clubs')->with('error', 'Không tìm thấy club.');
+        }
         $this->clubModel->delete($id);
         return redirect()->to('/admin/clubs')->with('success', 'Đã xóa club.');
     }

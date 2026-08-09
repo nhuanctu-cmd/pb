@@ -36,6 +36,23 @@ $stats = [
 
 <?= view('layouts/partials/stat_cards', ['stats' => $stats]) ?>
 
+<?php $operations = $operations ?? []; $operationSummary = $operations['summary'] ?? []; ?>
+<div class="row g-3 mb-4">
+    <?php foreach ([['Vandaag booking', (int) ($operationSummary['total'] ?? 0), 'bi-calendar-check', 'primary'], ['Đang chơi', (int) ($operationSummary['playing'] ?? 0), 'bi-play-circle', 'success'], ['Doanh thu snapshot', number_format((float) ($operationSummary['revenue'] ?? 0), 0, ',', '.') . 'đ', 'bi-cash-stack', 'warning'], ['Đã thu', number_format((float) ($operationSummary['collected'] ?? 0), 0, ',', '.') . 'đ', 'bi-wallet2', 'info']] as $metric): ?>
+        <div class="col-md-6 col-xl-3"><div class="card shadow-sm h-100"><div class="card-body d-flex justify-content-between align-items-center"><div><div class="text-muted small"><?= esc($metric[0]) ?></div><div class="h5 mb-0"><?= esc((string) $metric[1]) ?></div></div><i class="bi <?= esc($metric[2]) ?> fs-2 text-<?= esc($metric[3]) ?>"></i></div></div></div>
+    <?php endforeach; ?>
+</div>
+<?php $commerce = $operations['commerce'] ?? []; ?>
+<div class="row g-3 mb-4">
+    <?php foreach ([['Hóa đơn hôm nay', (int) ($commerce['invoices'] ?? 0), 'bi-receipt', 'primary'], ['Đã thu theo hóa đơn', number_format((float) ($commerce['collected'] ?? 0), 0, ',', '.') . 'đ', 'bi-cash-coin', 'success'], ['Công nợ mở', number_format((float) ($commerce['outstanding'] ?? 0), 0, ',', '.') . 'đ', 'bi-exclamation-circle', 'danger']] as $metric): ?>
+        <div class="col-md-4"><div class="card shadow-sm h-100"><div class="card-body d-flex justify-content-between align-items-center"><div><div class="text-muted small"><?= esc($metric[0]) ?></div><div class="h5 mb-0"><?= esc((string) $metric[1]) ?></div></div><i class="bi <?= esc($metric[2]) ?> fs-2 text-<?= esc($metric[3]) ?>"></i></div></div></div>
+    <?php endforeach; ?>
+</div>
+<div class="row g-4 mb-4">
+    <div class="col-lg-7"><div class="card shadow-sm"><div class="card-header d-flex justify-content-between"><span>Lịch sắp diễn ra hôm nay</span><a href="/admin/bookings" class="small">Mở booking</a></div><div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr><th>Khách</th><th>Giờ</th><th>Trạng thái</th></tr></thead><tbody><?php if (empty($operations['upcoming'])): ?><tr><td colspan="3" class="text-muted text-center py-3">Chưa có lịch.</td></tr><?php endif; ?><?php foreach (($operations['upcoming'] ?? []) as $booking): ?><tr><td><?= esc($booking->customer_name) ?></td><td><?= esc(substr((string) $booking->start_time, 0, 5) . ' - ' . substr((string) $booking->end_time, 0, 5)) ?></td><td><span class="badge text-bg-light"><?= esc($booking->status) ?></span></td></tr><?php endforeach; ?></tbody></table></div></div></div>
+    <div class="col-lg-5"><div class="card shadow-sm"><div class="card-header">Vận hành tại quầy</div><div class="card-body"><div class="d-flex justify-content-between mb-2"><span>Sân khả dụng</span><strong><?= (int) ($operations['courts']['available'] ?? 0) ?></strong></div><div class="d-flex justify-content-between mb-2"><span>Sân đang sử dụng</span><strong><?= (int) ($operations['courts']['occupied'] ?? 0) ?></strong></div><div class="d-flex justify-content-between mb-3"><span>Walk-in hôm nay</span><strong><?= (int) array_sum($operations['walk_ins'] ?? []) ?></strong></div><a href="/admin/walk-ins" class="btn btn-outline-primary btn-sm me-1">Quầy walk-in</a><a href="/admin/waitlist" class="btn btn-outline-secondary btn-sm">Waitlist (<?= (int) ($operations['waitlist']['waiting'] ?? 0) ?>)</a></div></div></div>
+</div>
+
 <div class="erp-dashboard-grid">
     <section class="erp-card">
         <div class="erp-card-header">

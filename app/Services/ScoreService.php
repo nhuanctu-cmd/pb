@@ -19,9 +19,10 @@ class ScoreService
         $this->logModel = model(TournamentScoreLogModel::class);
     }
 
-    public function startMatch($matchId): array
+    public function startMatch($matchId, ?int $tenantId = null): array
     {
-        $match = $this->getMatch((int) $matchId);
+        $tenantId = $tenantId ?: (int) (current_tenant_id() ?? 0);
+        $match = $this->getMatch((int) $matchId, $tenantId ?: null);
         if (! $match) {
             return ['success' => false, 'message' => 'Không tìm thấy trận đấu.'];
         }
@@ -34,25 +35,26 @@ class ScoreService
             $data['status'] = $this->matchStatus('running');
         }
 
-        $this->updateMatch((int) $matchId, $data);
+        $this->updateMatch((int) $matchId, $data, $tenantId ?: null);
 
-        return ['success' => true, 'message' => 'Trận đấu đã bắt đầu.', 'match' => $this->getMatch((int) $matchId)];
+        return ['success' => true, 'message' => 'Trận đấu đã bắt đầu.', 'match' => $this->getMatch((int) $matchId, $tenantId ?: null)];
     }
 
-    public function updateScore($matchId, $sets): array
+    public function updateScore($matchId, $sets, ?int $tenantId = null): array
     {
         $matchId = (int) $matchId;
-        $match = $this->getMatch($matchId);
+        $tenantId = $tenantId ?: (int) (current_tenant_id() ?? 0);
+        $match = $this->getMatch($matchId, $tenantId ?: null);
         if (! $match) {
             return ['success' => false, 'message' => 'Không tìm thấy trận đấu.'];
         }
 
-        $tenantId = (int) ($match->tenant_id ?? current_tenant_id() ?? 0);
+        $tenantId = (int) ($match->tenant_id ?? $tenantId);
         if ($tenantId <= 0) {
             return ['success' => false, 'message' => 'Thiếu tenant_id cho trận đấu.'];
         }
 
-        $oldScores = $this->scoresToArray($this->scoreModel->getByMatch($matchId));
+        $oldScores = $this->scoresToArray($this->scoreModel->getByMatch($matchId, $tenantId));
         $reason = $this->scoreReason();
         if (! empty($oldScores) && trim((string) $reason) === '') {
             return ['success' => false, 'message' => 'Vui lòng nhập lý do khi sửa điểm.'];
@@ -90,7 +92,7 @@ class ScoreService
             $matchData['finished_at'] = date('Y-m-d H:i:s');
         }
         if (! empty($matchData)) {
-            $this->updateMatch($matchId, $matchData);
+            $this->updateMatch($matchId, $matchData, $tenantId);
         }
 
         $newScores = $this->scoresToArray($normalized);
@@ -101,8 +103,8 @@ class ScoreService
             return ['success' => false, 'message' => 'Không thể lưu điểm.'];
         }
 
-        $standing = $winner['winner_team_id'] ? $this->updateGroupStanding($matchId) : ['skipped' => true];
-        $bracket = $winner['winner_team_id'] ? $this->advanceBracket($matchId) : ['skipped' => true];
+        $standing = $winner['winner_team_id'] ? $this->updateGroupStanding($matchId, $tenantId) : ['skipped' => true];
+        $bracket = $winner['winner_team_id'] ? $this->advanceBracket($matchId, $tenantId) : ['skipped' => true];
 
         $this->publishScoreUpdated($matchId, $newScores);
 
@@ -116,11 +118,12 @@ class ScoreService
         ];
     }
 
-    public function finishMatch($matchId): array
+    public function finishMatch($matchId, ?int $tenantId = null): array
     {
         $matchId = (int) $matchId;
-        $match = $this->getMatch($matchId);
-        $scores = $this->scoresToArray($this->scoreModel->getByMatch($matchId));
+        $tenantId = $tenantId ?: (int) (current_tenant_id() ?? 0);
+        $match = $this->getMatch($matchId, $tenantId ?: null);
+        $scores = $this->scoresToArray($this->scoreModel->getByMatch($matchId, $tenantId ?: null));
         $bestOf = $match ? $this->resolveBestOf($scores, $match) : count($scores);
         foreach ($scores as &$score) {
             $score['best_of'] = $bestOf;
@@ -142,14 +145,14 @@ class ScoreService
         if ($this->fieldExists('tournament_matches', 'finished_at')) {
             $data['finished_at'] = date('Y-m-d H:i:s');
         }
-        $this->updateMatch($matchId, $data);
+        $this->updateMatch($matchId, $data, $tenantId ?: null);
 
         return [
             'success' => true,
             'message' => 'Đã xác nhận kết quả trận.',
             'winner' => $winner,
-            'standing' => $this->updateGroupStanding($matchId),
-            'bracket' => $this->advanceBracket($matchId),
+            'standing' => $this->updateGroupStanding($matchId, $tenantId ?: null),
+            'bracket' => $this->advanceBracket($matchId, $tenantId ?: null),
         ];
     }
 
@@ -181,13 +184,13 @@ class ScoreService
         return ['winner_team_id' => null, 'sets_won' => 0, 'required_sets' => $requiredWins];
     }
 
-    public function updateGroupStanding($matchId): array
+    public function updateGroupStanding($matchId, ?int $tenantId = null): array
     {
         if (! $this->db->tableExists('tournament_group_standings')) {
             return ['skipped' => true, 'reason' => 'missing tournament_group_standings'];
         }
 
-        $match = $this->getMatch((int) $matchId);
+        $match = $this->getMatch((int) $matchId, $tenantId);
         if (! $match || empty($match->group_id) || empty($match->team_a_id) || empty($match->team_b_id) || empty($match->winner_team_id)) {
             return ['skipped' => true, 'reason' => 'match is not a group match or has no winner'];
         }
@@ -222,9 +225,9 @@ class ScoreService
         return ['updated' => true];
     }
 
-    public function advanceBracket($matchId): array
+    public function advanceBracket($matchId, ?int $tenantId = null): array
     {
-        $match = $this->getMatch((int) $matchId);
+        $match = $this->getMatch((int) $matchId, $tenantId);
         if (! $match || empty($match->winner_team_id) || ! $this->db->tableExists('tournament_matches')) {
             return ['skipped' => true, 'reason' => 'no next bracket match'];
         }
@@ -241,7 +244,7 @@ class ScoreService
             return ['skipped' => true, 'reason' => 'no next bracket match'];
         }
 
-        $nextMatch = $this->getMatch($nextMatchId);
+        $nextMatch = $this->getMatch($nextMatchId, $tenantId ?: (int) ($match->tenant_id ?? 0));
         if (! $slot && $nextMatch) {
             $slot = empty($nextMatch->team_a_id) ? 'a' : 'b';
         }
@@ -251,7 +254,7 @@ class ScoreService
             return ['skipped' => true, 'reason' => 'missing bracket target field'];
         }
 
-        $this->updateMatch($nextMatchId, [$field => (int) $match->winner_team_id]);
+        $this->updateMatch($nextMatchId, [$field => (int) $match->winner_team_id], $tenantId ?: (int) ($match->tenant_id ?? 0));
         return ['advanced' => true, 'next_match_id' => $nextMatchId, 'slot' => $field];
     }
 
@@ -260,13 +263,17 @@ class ScoreService
         return $this->logModel->addLog((int) $tenantId, (int) $matchId, $oldScore, $newScore, $changedBy, $reason);
     }
 
-    public function getMatch(int $matchId): ?object
+    public function getMatch(int $matchId, ?int $tenantId = null): ?object
     {
         if (! $this->db->tableExists('tournament_matches')) {
             return null;
         }
 
-        return $this->db->table('tournament_matches')->where('id', $matchId)->get()->getRow();
+        $builder = $this->db->table('tournament_matches')->where('id', $matchId);
+        if ($tenantId !== null && $tenantId > 0) {
+            $builder->where('tenant_id', $tenantId);
+        }
+        return $builder->get()->getRow();
     }
 
     protected function normalizeSets(array $sets, object $match, int $bestOf): array
@@ -334,10 +341,14 @@ class ScoreService
         return $raw >= 5 ? 5 : ($raw >= 3 ? 3 : 1);
     }
 
-    protected function updateMatch(int $matchId, array $data): void
+    protected function updateMatch(int $matchId, array $data, ?int $tenantId = null): void
     {
         if (! empty($data) && $this->db->tableExists('tournament_matches')) {
-            $this->db->table('tournament_matches')->where('id', $matchId)->update($data);
+            $builder = $this->db->table('tournament_matches')->where('id', $matchId);
+            if ($tenantId !== null && $tenantId > 0) {
+                $builder->where('tenant_id', $tenantId);
+            }
+            $builder->update($data);
         }
     }
 

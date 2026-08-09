@@ -67,6 +67,15 @@ class BranchHolidayModel extends Model
         return $builder->orderBy('holiday_date', 'ASC')->findAll();
     }
 
+    public function findForTenant(int $holidayId, int $branchId, int $tenantId): ?object
+    {
+        return $this->where('id', $holidayId)
+            ->where('branch_id', $branchId)
+            ->where('tenant_id', $tenantId)
+            ->where('deleted_at', null)
+            ->first();
+    }
+
     public function isHoliday(int $branchId, string $date): bool
     {
         return $this->where('branch_id', $branchId)

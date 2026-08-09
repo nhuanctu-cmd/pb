@@ -52,4 +52,12 @@ class MembershipPackageModel extends Model
                     ->orderBy('price', 'ASC')
                     ->findAll();
     }
+
+    public function findForTenant(int $packageId, int $tenantId)
+    {
+        return $this->where('id', $packageId)
+            ->where('tenant_id', $tenantId)
+            ->where('deleted_at', null)
+            ->first();
+    }
 }

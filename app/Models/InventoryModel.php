@@ -7,8 +7,8 @@ use CodeIgniter\Model;
 class InventoryModel extends Model
 {
     protected $table            = 'inventories';
-    protected $primaryKey       = ['tenant_id', 'branch_id', 'product_id'];
-    protected $useAutoIncrement = false;
+    protected $primaryKey       = 'id';
+    protected $useAutoIncrement = true;
     protected $returnType       = 'array';
     protected $useSoftDeletes   = false;
     protected $allowedFields    = ['tenant_id', 'branch_id', 'product_id', 'quantity'];
@@ -40,5 +40,13 @@ class InventoryModel extends Model
         return $this->where('tenant_id', $tenantId)
             ->where('product_id', $productId)
             ->findAll();
+    }
+
+    public function findForUpdate(int $tenantId, int $branchId, int $productId): ?array
+    {
+        return $this->db->query(
+            'SELECT * FROM inventories WHERE tenant_id = ? AND branch_id = ? AND product_id = ? LIMIT 1 FOR UPDATE',
+            [$tenantId, $branchId, $productId]
+        )->getRowArray() ?: null;
     }
 }

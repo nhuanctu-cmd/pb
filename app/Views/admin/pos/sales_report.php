@@ -1,3 +1,5 @@
+<?= $this->extend('layouts/admin_master') ?>
+<?= $this->section('content') ?>
 <!-- Sales Report Page -->
 <div class="container-fluid">
     <div class="row mb-3">
@@ -135,3 +137,4 @@ $(document).ready(function() {
     });
 });
 </script>
+<?= $this->endSection() ?>

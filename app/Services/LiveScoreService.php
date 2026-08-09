@@ -15,7 +15,7 @@ class LiveScoreService
 
     public function getLiveMatches(?int $tenantId = null, ?int $tournamentId = null): array
     {
-        if (! $this->db->tableExists('tournament_matches')) {
+        if (! $tenantId || ! $this->db->tableExists('tournament_matches')) {
             return [];
         }
 
@@ -32,7 +32,7 @@ class LiveScoreService
 
         $matches = $builder->orderBy('m.id', 'ASC')->limit(100)->get()->getResult();
         foreach ($matches as $match) {
-            $match->scores = $this->getScores((int) $match->id);
+            $match->scores = $this->getScores((int) $match->id, $tenantId);
             $match->score_text = $this->formatScore($match->scores);
         }
 
@@ -75,7 +75,7 @@ class LiveScoreService
         ];
     }
 
-    protected function getScores(int $matchId): array
+    protected function getScores(int $matchId, int $tenantId): array
     {
         if (! $this->db->tableExists('tournament_match_scores')) {
             return [];
@@ -83,6 +83,7 @@ class LiveScoreService
 
         return $this->db->table('tournament_match_scores')
             ->where('match_id', $matchId)
+            ->where('tenant_id', $tenantId)
             ->orderBy('set_no', 'ASC')
             ->get()
             ->getResult();

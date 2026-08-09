@@ -25,6 +25,12 @@ class TournamentService
     public function createTournament(array $data): array
     {
         $tenantId = (int) $data['tenant_id'];
+        $branchId = (int) ($data['branch_id'] ?? 0);
+        $branch = model(\App\Models\BranchModel::class)
+            ->where('id', $branchId)->where('tenant_id', $tenantId)->where('deleted_at', null)->first();
+        if ($tenantId <= 0 || ! $branch) {
+            return ['success' => false, 'message' => 'Chi nhánh không thuộc tenant hiện tại.'];
+        }
         $data['slug_vi'] = $data['slug_vi'] ?: $this->tournamentModel->generateUniqueSlug($data['name_vi'], $tenantId);
         $data['slug_en'] = $data['slug_en'] ?: ($data['name_en'] ? $this->tournamentModel->generateUniqueSlug($data['name_en'], $tenantId) : null);
         $data['status'] = $data['status'] ?? 'draft';
@@ -45,17 +51,21 @@ class TournamentService
             return ['success' => false, 'message' => 'Không tạo được giải đấu.'];
         }
 
-        return ['success' => true, 'message' => 'Đã tạo giải đấu.', 'tournament' => $this->tournamentModel->find($tournamentId)];
+        return ['success' => true, 'message' => 'Đã tạo giải đấu.', 'tournament' => $this->tournamentModel->findForTenant((int) $tournamentId, $tenantId)];
     }
 
-    public function updateTournament(int $id, array $data): array
+    public function updateTournament(int $id, array $data, ?int $tenantId = null): array
     {
-        $tournament = $this->tournamentModel->find($id);
+        $tenantId = $tenantId ?? (int) ($data['tenant_id'] ?? 0);
+        $tournament = $this->tournamentModel->findForTenant($id, $tenantId);
         if (! $tournament) {
             return ['success' => false, 'message' => 'Không tìm thấy giải đấu.'];
         }
 
-        $tenantId = (int) $tournament->tenant_id;
+        $branchId = (int) ($data['branch_id'] ?? $tournament->branch_id);
+        if (! model(\App\Models\BranchModel::class)->where('id', $branchId)->where('tenant_id', $tenantId)->where('deleted_at', null)->first()) {
+            return ['success' => false, 'message' => 'Chi nhánh không thuộc tenant hiện tại.'];
+        }
         $data['slug_vi'] = $data['slug_vi'] ?: $this->tournamentModel->generateUniqueSlug($data['name_vi'], $tenantId, $id);
         $data['slug_en'] = $data['slug_en'] ?: ($data['name_en'] ? $this->tournamentModel->generateUniqueSlug($data['name_en'], $tenantId, $id) : null);
 
@@ -69,38 +79,62 @@ class TournamentService
             return ['success' => false, 'message' => 'Không cập nhật được giải đấu.'];
         }
 
-        return ['success' => true, 'message' => 'Đã cập nhật giải đấu.', 'tournament' => $this->tournamentModel->find($id)];
+        return ['success' => true, 'message' => 'Đã cập nhật giải đấu.', 'tournament' => $this->tournamentModel->findForTenant($id, $tenantId)];
     }
 
-    public function openRegistration(int $id): array
+    public function openRegistration(int $id, ?int $tenantId = null): array
     {
-        return $this->setStatus($id, 'open', 'Đã mở đăng ký.');
+        return $this->setStatus($id, 'open', 'Đã mở đăng ký.', $tenantId);
     }
 
-    public function closeRegistration(int $id): array
+    public function closeRegistration(int $id, ?int $tenantId = null): array
     {
-        return $this->setStatus($id, 'closed', 'Đã đóng đăng ký.');
+        return $this->setStatus($id, 'closed', 'Đã đóng đăng ký.', $tenantId);
     }
 
-    public function publishTournament(int $id): array
+    public function publishTournament(int $id, ?int $tenantId = null): array
     {
-        return $this->openRegistration($id);
+        return $this->openRegistration($id, $tenantId);
     }
 
-    public function cancelTournament(int $id): array
+    public function cancelTournament(int $id, ?int $tenantId = null): array
     {
-        return $this->setStatus($id, 'cancelled', 'Đã hủy giải đấu.');
+        return $this->setStatus($id, 'cancelled', 'Đã hủy giải đấu.', $tenantId);
     }
 
-    private function setStatus(int $id, string $status, string $message): array
+    private function setStatus(int $id, string $status, string $message, ?int $tenantId = null): array
     {
-        $tournament = $this->tournamentModel->find($id);
+        if ($tenantId === null) {
+            $tournament = $this->tournamentModel->find($id);
+            $tenantId = $tournament ? (int) $tournament->tenant_id : null;
+        } else {
+            $tournament = $this->tournamentModel->findForTenant($id, $tenantId);
+        }
         if (! $tournament) {
             return ['success' => false, 'message' => 'Không tìm thấy giải đấu.'];
         }
 
+        $allowed = [
+            'draft' => ['open', 'cancelled'], 'open' => ['closed', 'running', 'cancelled'],
+            'closed' => ['running', 'cancelled'], 'running' => ['completed', 'cancelled'],
+            'completed' => [], 'cancelled' => [],
+        ];
+        if (! in_array($status, $allowed[$tournament->status] ?? [], true)) {
+            return ['success' => false, 'message' => 'Trạng thái giải đấu không hợp lệ.'];
+        }
+        $db = \Config\Database::connect();
+        $db->transStart();
+        $locked = $this->tournamentModel->findForUpdate($id, (int) $tenantId);
+        if (! $locked || ! in_array($status, $allowed[$locked->status] ?? [], true)) {
+            $db->transRollback();
+            return ['success' => false, 'message' => 'Trạng thái giải đấu không hợp lệ.'];
+        }
         $this->tournamentModel->update($id, ['status' => $status]);
-        return ['success' => true, 'message' => $message, 'tournament' => $this->tournamentModel->find($id)];
+        $db->transComplete();
+        if (! $db->transStatus()) {
+            return ['success' => false, 'message' => 'Không cập nhật được trạng thái giải đấu.'];
+        }
+        return ['success' => true, 'message' => $message, 'tournament' => $this->tournamentModel->findForTenant($id, (int) $tenantId)];
     }
 
     private function syncChildren(int $tenantId, int $tournamentId, array $data): void

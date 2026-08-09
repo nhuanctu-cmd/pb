@@ -1,3 +1,5 @@
+<?= $this->extend('layouts/admin_master') ?>
+<?= $this->section('content') ?>
 <!-- Product Management Page -->
 <div class="container-fluid">
     <div class="row mb-3">
@@ -194,3 +196,4 @@ function importStock(id) {
     }
 }
 </script>
+<?= $this->endSection() ?>

@@ -112,28 +112,28 @@ class NotificationService
         }, $template);
     }
 
-    public function getUnreadCount(int $userId): int
+    public function getUnreadCount(int $userId, ?int $tenantId = null): int
     {
-        return $this->notificationModel->countUnreadByUser($userId);
+        return $this->notificationModel->countUnreadByUser($userId, $tenantId);
     }
 
-    public function getUnreadByUser(int $userId, int $limit = 20): array
+    public function getUnreadByUser(int $userId, int $limit = 20, ?int $tenantId = null): array
     {
-        return $this->notificationModel->getUnreadByUser($userId, $limit);
+        return $this->notificationModel->getUnreadByUser($userId, $limit, $tenantId);
     }
 
-    public function getRecentByUser(int $userId, int $limit = 50): array
+    public function getRecentByUser(int $userId, int $limit = 50, ?int $tenantId = null): array
     {
-        return $this->notificationModel->getRecentByUser($userId, $limit);
+        return $this->notificationModel->getRecentByUser($userId, $limit, $tenantId);
     }
 
-    public function markAsRead(int $notificationId, int $userId): bool
+    public function markAsRead(int $notificationId, int $userId, ?int $tenantId = null): bool
     {
-        return $this->notificationModel->markAsRead($notificationId, $userId);
+        return $this->notificationModel->markAsRead($notificationId, $userId, $tenantId);
     }
 
-    public function markAllAsRead(int $userId): bool
+    public function markAllAsRead(int $userId, ?int $tenantId = null): bool
     {
-        return $this->notificationModel->markAllAsRead($userId);
+        return $this->notificationModel->markAllAsRead($userId, $tenantId);
     }
 }

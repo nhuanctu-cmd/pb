@@ -21,11 +21,12 @@ class NotificationsController extends BaseController
     public function index()
     {
         $userId = user_id();
+        $tenantId = current_tenant_id();
 
         $this->viewData['pageTitle']       = lang('App.notifications');
         $this->viewData['pageDescription'] = lang('App.notifications_subtitle');
         $this->viewData['notifications']   = $userId
-            ? $this->notificationService->getRecentByUser($userId, 100)
+            ? $this->notificationService->getRecentByUser($userId, 100, $tenantId ? (int) $tenantId : null)
             : [];
 
         return $this->render('admin/notifications/index', $this->viewData);
@@ -37,7 +38,8 @@ class NotificationsController extends BaseController
     public function unreadCount(): ResponseInterface
     {
         $userId = user_id();
-        $count  = $userId ? $this->notificationService->getUnreadCount($userId) : 0;
+        $tenantId = current_tenant_id();
+        $count  = $userId ? $this->notificationService->getUnreadCount($userId, $tenantId ? (int) $tenantId : null) : 0;
 
         return $this->response->setJSON(['count' => $count]);
     }
@@ -48,7 +50,8 @@ class NotificationsController extends BaseController
     public function unread(): ResponseInterface
     {
         $userId = user_id();
-        $items  = $userId ? $this->notificationService->getUnreadByUser($userId, 20) : [];
+        $tenantId = current_tenant_id();
+        $items  = $userId ? $this->notificationService->getUnreadByUser($userId, 20, $tenantId ? (int) $tenantId : null) : [];
 
         return $this->response->setJSON(['items' => $items]);
     }
@@ -56,26 +59,28 @@ class NotificationsController extends BaseController
     public function markRead(int $id): ResponseInterface
     {
         $userId = user_id();
+        $tenantId = current_tenant_id();
         if (! $userId) {
             return $this->response->setStatusCode(401)->setJSON(['success' => false]);
         }
 
-        $success = $this->notificationService->markAsRead($id, $userId);
+        $success = $this->notificationService->markAsRead($id, $userId, $tenantId ? (int) $tenantId : null);
 
         return $this->response->setJSON([
             'success' => $success,
-            'count'   => $this->notificationService->getUnreadCount($userId),
+            'count'   => $this->notificationService->getUnreadCount($userId, $tenantId ? (int) $tenantId : null),
         ]);
     }
 
     public function markAllRead(): ResponseInterface
     {
         $userId = user_id();
+        $tenantId = current_tenant_id();
         if (! $userId) {
             return $this->response->setStatusCode(401)->setJSON(['success' => false]);
         }
 
-        $success = $this->notificationService->markAllAsRead($userId);
+        $success = $this->notificationService->markAllAsRead($userId, $tenantId ? (int) $tenantId : null);
 
         return $this->response->setJSON([
             'success' => $success,

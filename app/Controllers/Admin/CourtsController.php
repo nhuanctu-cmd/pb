@@ -5,16 +5,28 @@ namespace App\Controllers\Admin;
 use App\Controllers\BaseController;
 use App\Services\CourtService;
 use App\Models\BranchModel;
+use App\Models\CourtModel;
+use App\Models\CourtTypeModel;
+use App\Models\CourtImageModel;
+use App\Models\CourtMaintenanceModel;
 
 class CourtsController extends BaseController
 {
     protected CourtService $courtService;
     protected BranchModel $branchModel;
+    protected CourtModel $courtModel;
+    protected CourtTypeModel $courtTypeModel;
+    protected CourtImageModel $courtImageModel;
+    protected CourtMaintenanceModel $maintenanceModel;
 
     public function __construct()
     {
         $this->courtService = new CourtService();
         $this->branchModel  = new BranchModel();
+        $this->courtModel   = new CourtModel();
+        $this->courtTypeModel = new CourtTypeModel();
+        $this->courtImageModel = new CourtImageModel();
+        $this->maintenanceModel = new CourtMaintenanceModel();
     }
 
     public function index()
@@ -28,7 +40,8 @@ class CourtsController extends BaseController
 
         $this->viewData['branches'] = $branches;
         $this->viewData['courtTypes'] = $this->courtService->getActiveCourtTypes($tenantId);
-        $this->viewData['currentBranchId'] = $branchId ?: ($branches[0]->id ?? null);
+        $requestedBranch = $branchId ? $this->branchModel->findForTenant((int) $branchId, (int) $tenantId) : null;
+        $this->viewData['currentBranchId'] = $requestedBranch?->id ?? ($branches[0]->id ?? null);
         $this->viewData['filters'] = $filters;
 
         if ($this->viewData['currentBranchId']) {
@@ -58,6 +71,10 @@ class CourtsController extends BaseController
         $tenantId = session('tenant_id');
 
         // SaaS: kiểm tra hạn mức sân theo gói
+        if (!$tenantId) {
+            return redirect()->to('/admin/tenants/select')->with('warning', lang('App.forbidden'));
+        }
+
         $limit = (new \App\Services\TenantPlanService())->checkLimit((int) $tenantId, 'courts');
         if (! $limit['allowed']) {
             return redirect()->back()->withInput()
@@ -65,6 +82,11 @@ class CourtsController extends BaseController
         }
 
         $branchId = (int) $this->request->getPost('branch_id');
+        if (!$this->branchModel->findForTenant($branchId, (int) $tenantId)
+            || !$this->courtTypeModel->where('id', (int) $this->request->getPost('court_type_id'))
+                ->where('tenant_id', (int) $tenantId)->where('deleted_at', null)->first()) {
+            return redirect()->back()->withInput()->with('error', lang('App.forbidden'));
+        }
 
         $rules = [
             'branch_id'     => 'required|integer',
@@ -116,12 +138,12 @@ class CourtsController extends BaseController
 
     public function edit(int $id)
     {
-        $court = $this->courtService->getCourtById($id);
+        $tenantId = (int) session('tenant_id');
+        $court = $tenantId ? $this->courtModel->findForTenant($id, $tenantId) : null;
         if (!$court) {
             return redirect()->to('/admin/courts')->with('error', lang('App.no_data'));
         }
 
-        $tenantId = session('tenant_id');
         $this->viewData['pageTitle'] = lang('Court.edit');
         $this->viewData['court'] = $court;
         $this->viewData['branches'] = $this->branchModel->getByTenant($tenantId);
@@ -134,12 +156,18 @@ class CourtsController extends BaseController
 
     public function update(int $id)
     {
-        $court = $this->courtService->getCourtById($id);
+        $tenantId = (int) session('tenant_id');
+        $court = $tenantId ? $this->courtModel->findForTenant($id, $tenantId) : null;
         if (!$court) {
             return redirect()->to('/admin/courts')->with('error', lang('App.no_data'));
         }
 
         $branchId = (int) ($this->request->getPost('branch_id') ?: $court->branch_id);
+        if (!$this->branchModel->findForTenant($branchId, $tenantId)
+            || !$this->courtTypeModel->where('id', (int) $this->request->getPost('court_type_id'))
+                ->where('tenant_id', $tenantId)->where('deleted_at', null)->first()) {
+            return redirect()->back()->withInput()->with('error', lang('App.forbidden'));
+        }
 
         $rules = [
             'branch_id'     => 'required|integer',
@@ -188,7 +216,8 @@ class CourtsController extends BaseController
 
     public function delete(int $id)
     {
-        $court = $this->courtService->getCourtById($id);
+        $tenantId = (int) session('tenant_id');
+        $court = $tenantId ? $this->courtModel->findForTenant($id, $tenantId) : null;
         if (!$court) {
             return redirect()->to('/admin/courts')->with('error', lang('App.no_data'));
         }
@@ -202,7 +231,8 @@ class CourtsController extends BaseController
 
     public function status(int $id)
     {
-        $court = $this->courtService->getCourtById($id);
+        $tenantId = (int) session('tenant_id');
+        $court = $tenantId ? $this->courtModel->findForTenant($id, $tenantId) : null;
         if (!$court) {
             return $this->response->setJSON(['success' => false, 'message' => lang('App.no_data')]);
         }
@@ -221,7 +251,8 @@ class CourtsController extends BaseController
 
     public function uploadImage(int $id)
     {
-        $court = $this->courtService->getCourtById($id);
+        $tenantId = (int) session('tenant_id');
+        $court = $tenantId ? $this->courtModel->findForTenant($id, $tenantId) : null;
         if (!$court) {
             return $this->response->setJSON(['success' => false, 'message' => lang('App.no_data')]);
         }
@@ -262,6 +293,10 @@ class CourtsController extends BaseController
 
     public function deleteImage(int $id)
     {
+        $tenantId = (int) session('tenant_id');
+        if (!$tenantId || !$this->courtImageModel->findForTenant($id, $tenantId)) {
+            return $this->response->setJSON(['success' => false]);
+        }
         if ($this->courtService->deleteImage($id)) {
             return $this->response->setJSON(['success' => true]);
         }
@@ -271,6 +306,12 @@ class CourtsController extends BaseController
 
     public function setPrimaryImage(int $courtId, int $imageId)
     {
+        $tenantId = (int) session('tenant_id');
+        $court = $tenantId ? $this->courtModel->findForTenant($courtId, $tenantId) : null;
+        $image = $tenantId ? $this->courtImageModel->findForTenant($imageId, $tenantId) : null;
+        if (!$court || !$image || (int) $image->court_id !== $courtId) {
+            return $this->response->setJSON(['success' => false]);
+        }
         if ($this->courtService->setPrimaryImage($courtId, $imageId)) {
             return $this->response->setJSON(['success' => true]);
         }
@@ -280,7 +321,8 @@ class CourtsController extends BaseController
 
     public function maintenance(int $id)
     {
-        $court = $this->courtService->getCourtById($id);
+        $tenantId = (int) session('tenant_id');
+        $court = $tenantId ? $this->courtModel->findForTenant($id, $tenantId) : null;
         if (!$court) {
             return redirect()->to('/admin/courts')->with('error', lang('App.no_data'));
         }
@@ -294,7 +336,8 @@ class CourtsController extends BaseController
 
     public function storeMaintenance(int $courtId)
     {
-        $court = $this->courtService->getCourtById($courtId);
+        $tenantId = (int) session('tenant_id');
+        $court = $tenantId ? $this->courtModel->findForTenant($courtId, $tenantId) : null;
         if (!$court) {
             return redirect()->back()->with('error', lang('App.no_data'));
         }
@@ -339,6 +382,10 @@ class CourtsController extends BaseController
 
     public function updateMaintenanceStatus(int $id)
     {
+        $tenantId = (int) session('tenant_id');
+        if (!$tenantId || !$this->maintenanceModel->findForTenant($id, $tenantId)) {
+            return $this->response->setJSON(['success' => false]);
+        }
         $status = $this->request->getPost('status');
         if (!in_array($status, ['scheduled', 'doing', 'completed', 'cancelled'])) {
             return $this->response->setJSON(['success' => false]);
@@ -360,7 +407,7 @@ class CourtsController extends BaseController
         $this->viewData['branches'] = $this->branchModel->getByTenant($tenantId);
 
         $branchId = $this->request->getGet('branch_id');
-        if ($branchId) {
+        if ($branchId && $this->branchModel->findForTenant((int) $branchId, (int) $tenantId)) {
             $this->viewData['currentBranchId'] = (int) $branchId;
             $this->viewData['courts'] = $this->courtService->getCourtGridByBranch((int) $branchId);
         } else {

@@ -10,6 +10,7 @@ use App\Models\BranchHolidayModel;
 use App\Models\BranchOpeningHourModel;
 use App\Models\CourtMaintenanceModel;
 use App\Models\CourtModel;
+use App\Models\BranchModel;
 use App\Models\PricingRuleModel;
 use App\Services\BookingService;
 use App\Services\PricingService;
@@ -28,9 +29,14 @@ class OpsAjaxController extends BaseController
             return $this->response->setJSON(['success' => false, 'message' => 'Thiếu thông tin lọc sân.']);
         }
 
+        if (!$tenantId || !model(BranchModel::class)->findForTenant($branchId, $tenantId)) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Chi nhánh không thuộc tenant hiện tại.']);
+        }
+
         $courtModel = model(CourtModel::class);
         $bookingService = service('bookingService');
         $courts = $courtModel->getByBranch($branchId);
+        $courts = array_values(array_filter($courts, static fn ($court) => (int) $court->tenant_id === $tenantId));
         $data = [];
 
         foreach ($courts as $court) {
@@ -89,8 +95,13 @@ class OpsAjaxController extends BaseController
         $endTime = (string) ($this->request->getPost('end_time') ?: $this->request->getGet('end_time') ?: '19:00');
         $playerId = $this->request->getPost('player_id') ?: $this->request->getGet('player_id');
 
-        if (! $branchId || ! $courtId) {
+        if (! $branchId || ! $courtId || !$tenantId) {
             return $this->response->setJSON(['success' => false, 'message' => 'Thiếu chi nhánh hoặc sân.']);
+        }
+
+        $court = model(CourtModel::class)->findForTenant($courtId, $tenantId);
+        if (!$court || (int) $court->branch_id !== $branchId) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Sân không thuộc tenant/chi nhánh.']);
         }
 
         $result = (new PricingService())->getPrice($tenantId, $branchId, $courtId, $date, $startTime, $endTime, $playerId ? (int) $playerId : null);
@@ -111,12 +122,13 @@ class OpsAjaxController extends BaseController
 
     public function bookingDrawer(int $id)
     {
-        $booking = model(BookingModel::class)->find($id);
+        $tenantId = (int) current_tenant_id();
+        $booking = $tenantId ? model(BookingModel::class)->findForTenant($id, $tenantId) : null;
         if (! $booking) {
             return $this->response->setJSON(['success' => false, 'message' => 'Không tìm thấy booking.']);
         }
 
-        $items = model(BookingItemModel::class)->getByBooking($id);
+        $items = model(BookingItemModel::class)->getByBooking($id, $tenantId);
         return $this->response->setJSON([
             'success' => true,
             'html' => view('admin/bookings/partials/drawer', ['booking' => $booking, 'items' => $items]),
@@ -125,7 +137,8 @@ class OpsAjaxController extends BaseController
 
     public function courtDrawer(int $id)
     {
-        $court = model(CourtModel::class)->find($id);
+        $tenantId = (int) current_tenant_id();
+        $court = $tenantId ? model(CourtModel::class)->findForTenant($id, $tenantId) : null;
         if (! $court) {
             return $this->response->setJSON(['success' => false, 'message' => 'Không tìm thấy sân.']);
         }
@@ -139,7 +152,8 @@ class OpsAjaxController extends BaseController
 
     public function courtPricingRules(int $id)
     {
-        $court = model(CourtModel::class)->find($id);
+        $tenantId = (int) current_tenant_id();
+        $court = $tenantId ? model(CourtModel::class)->findForTenant($id, $tenantId) : null;
         if (! $court) {
             return $this->response->setJSON(['success' => false, 'message' => 'Không tìm thấy sân.']);
         }
@@ -150,7 +164,8 @@ class OpsAjaxController extends BaseController
 
     public function reschedulePreview(int $id)
     {
-        $booking = model(BookingModel::class)->find($id);
+        $tenantId = (int) current_tenant_id();
+        $booking = $tenantId ? model(BookingModel::class)->findForTenant($id, $tenantId) : null;
         if (! $booking) {
             return $this->response->setJSON(['success' => false, 'message' => 'Không tìm thấy booking.']);
         }
@@ -158,7 +173,7 @@ class OpsAjaxController extends BaseController
         $date = (string) $this->request->getGet('date');
         $startTime = (string) $this->request->getGet('start_time');
         $endTime = (string) $this->request->getGet('end_time');
-        $items = model(BookingItemModel::class)->getByBooking($id);
+        $items = model(BookingItemModel::class)->getByBooking($id, $tenantId);
         $preview = [];
 
         foreach ($items as $item) {

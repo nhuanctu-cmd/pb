@@ -48,7 +48,7 @@ class PosController extends BaseController
      */
     public function getOrder(int $orderId): ResponseInterface
     {
-        $order = $this->posService->loadOrder($orderId);
+        $order = $this->posService->loadOrder($orderId, (int) session()->get('tenant_id'));
         if (!$order) {
             return $this->response->setStatusCode(404)->setJSON(['error' => 'Order not found']);
         }
@@ -70,7 +70,7 @@ class PosController extends BaseController
         $productId = (int)$this->request->getPost('product_id');
         $quantity = (int)$this->request->getPost('quantity', 1);
 
-        $this->posService->loadOrder($orderId);
+        $this->posService->loadOrder($orderId, (int) session()->get('tenant_id'));
 
         try {
             $this->posService->addItem($tenantId, $productId, $quantity);
@@ -96,7 +96,7 @@ class PosController extends BaseController
      */
     public function removeItem(int $orderId, int $itemId): ResponseInterface
     {
-        $this->posService->loadOrder($orderId);
+        $this->posService->loadOrder($orderId, (int) session()->get('tenant_id'));
 
         try {
             $this->posService->removeItem($itemId);
@@ -125,7 +125,7 @@ class PosController extends BaseController
         $orderId = (int)$this->request->getPost('order_id');
         $newQuantity = (int)$this->request->getPost('quantity');
 
-        $this->posService->loadOrder($orderId);
+        $this->posService->loadOrder($orderId, (int) session()->get('tenant_id'));
 
         try {
             $this->posService->updateItemQuantity($itemId, $newQuantity);
@@ -153,7 +153,7 @@ class PosController extends BaseController
     {
         $bookingId = (int)$this->request->getPost('booking_id');
 
-        $this->posService->loadOrder($orderId);
+        $this->posService->loadOrder($orderId, (int) session()->get('tenant_id'));
 
         try {
             $this->posService->attachBooking($bookingId);
@@ -179,7 +179,7 @@ class PosController extends BaseController
     {
         $playerId = (int)$this->request->getPost('player_id');
 
-        $this->posService->loadOrder($orderId);
+        $this->posService->loadOrder($orderId, (int) session()->get('tenant_id'));
 
         try {
             $this->posService->attachPlayer($playerId);
@@ -270,7 +270,7 @@ class PosController extends BaseController
         $paidAmount = (float)$this->request->getPost('paid_amount');
         $note = $this->request->getPost('note');
 
-        $this->posService->loadOrder($orderId);
+        $this->posService->loadOrder($orderId, (int) session()->get('tenant_id'));
 
         try {
             $success = $this->posService->checkout($paidAmount, $note);
@@ -305,7 +305,9 @@ class PosController extends BaseController
         $reason = $this->request->getPost('reason');
 
         try {
-            $success = $this->posService->cancelOrder($orderId, $reason);
+            $success = $this->posService->cancelOrder(
+                $orderId, $reason, (int) session()->get('tenant_id')
+            );
 
             if ($success) {
                 // Create new order after cancellation

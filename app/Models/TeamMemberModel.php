@@ -26,13 +26,15 @@ class TeamMemberModel extends Model
         'status' => 'permit_empty|in_list[invited,accepted,rejected,removed]',
     ];
 
-    public function getByTeam(int $teamId): array
+    public function getByTeam(int $teamId, ?int $tenantId = null): array
     {
-        return $this->select('team_members.*, players.full_name, players.rating_score, players.level')
+        $builder = $this->select('team_members.*, players.full_name, players.rating_score, players.level')
             ->join('players', 'players.id = team_members.player_id', 'left')
             ->where('team_members.team_id', $teamId)
-            ->where('team_members.deleted_at', null)
-            ->orderBy('team_members.role', 'ASC')
-            ->findAll();
+            ->where('team_members.deleted_at', null);
+        if ($tenantId !== null) {
+            $builder->where('team_members.tenant_id', $tenantId);
+        }
+        return $builder->orderBy('team_members.role', 'ASC')->findAll();
     }
 }

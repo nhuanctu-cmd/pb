@@ -68,6 +68,14 @@ class CourtMaintenanceModel extends Model
                     ->findAll();
     }
 
+    public function findForTenant(int $maintenanceId, int $tenantId): ?object
+    {
+        return $this->where('id', $maintenanceId)
+            ->where('tenant_id', $tenantId)
+            ->where('deleted_at', null)
+            ->first();
+    }
+
     public function getActiveByCourt(int $courtId)
     {
         return $this->where('court_id', $courtId)
@@ -100,22 +108,23 @@ class CourtMaintenanceModel extends Model
         $builder = $this->where('court_id', $courtId)
                         ->where('deleted_at', null)
                         ->whereIn('status', ['scheduled', 'doing'])
+                        ->where('start_time <', $endTime ?: '9999-12-31 23:59:59')
                         ->groupStart()
-                        ->where('start_time <=', $startTime)
-                        ->where('end_time >=', $startTime)
+                        ->where('end_time IS NULL', null, false)
+                        ->orWhere('end_time >', $startTime)
                         ->groupEnd();
-
-        if ($endTime) {
-            $builder->orGroupStart()
-                    ->where('start_time >=', $startTime)
-                    ->where('start_time <', $endTime)
-                    ->groupEnd();
-        }
 
         if ($excludeId) {
             $builder->where('id !=', $excludeId);
         }
 
         return $builder->countAllResults() > 0;
+    }
+
+    public static function intervalsOverlap(string $existingStart, ?string $existingEnd, string $requestedStart, ?string $requestedEnd): bool
+    {
+        $existingEnd = $existingEnd ?: '9999-12-31 23:59:59';
+        $requestedEnd = $requestedEnd ?: '9999-12-31 23:59:59';
+        return $existingStart < $requestedEnd && $requestedStart < $existingEnd;
     }
 }

@@ -18,8 +18,15 @@ class MembershipService
 
     public function buyPackage(int $playerId, int $packageId, int $tenantId, ?int $createdBy = null): ?int
     {
-        $package = $this->packageModel->find($packageId);
+        if ($playerId <= 0 || $packageId <= 0 || $tenantId <= 0) {
+            return null;
+        }
+        $package = $this->packageModel->findForTenant($packageId, $tenantId);
         if (!$package || (int) $package->tenant_id !== $tenantId || $package->status !== 'active') {
+            return null;
+        }
+
+        if ((int) $package->duration_days <= 0) {
             return null;
         }
 
@@ -28,13 +35,19 @@ class MembershipService
             return null;
         }
 
-        $this->membershipModel->db->transStart();
+        $db = \Config\Database::connect();
+        $db->transStart();
 
-        // Cancel any active membership
-        $activeMembership = $this->membershipModel->getActiveByPlayer($playerId, $tenantId);
-        if ($activeMembership) {
-            $this->membershipModel->update($activeMembership->id, ['status' => 'cancelled']);
-        }
+        // Serialize membership replacement for this player and tenant.
+        $db->query(
+            'SELECT id FROM memberships WHERE player_id = ? AND tenant_id = ? AND status = ? AND deleted_at IS NULL FOR UPDATE',
+            [$playerId, $tenantId, 'active']
+        );
+        $this->membershipModel->where('player_id', $playerId)
+            ->where('tenant_id', $tenantId)
+            ->where('status', 'active')
+            ->set(['status' => 'cancelled'])
+            ->update();
 
         // Create new membership
         $startDate = date('Y-m-d');
@@ -52,29 +65,37 @@ class MembershipService
 
         $membershipId = $this->membershipModel->insert($data);
         if (!$membershipId) {
-            $this->membershipModel->db->transRollback();
+            $db->transRollback();
             return null;
         }
 
-        $this->membershipModel->db->transComplete();
-        if ($this->membershipModel->db->transStatus() === false) {
-            $this->membershipModel->db->transRollback();
+        $db->transComplete();
+        if ($db->transStatus() === false) {
+            $db->transRollback();
             return null;
         }
 
         return (int) $membershipId;
     }
 
-    public function renew(int $membershipId): ?int
+    public function renew(int $membershipId, ?int $tenantId = null): ?int
     {
-        $membership = $this->membershipModel->find($membershipId);
-        if (!$membership) return null;
+        $db = \Config\Database::connect();
+        $db->transStart();
+        $membership = $this->membershipModel->findForUpdate($membershipId, $tenantId);
+        if (!$membership) {
+            $db->transRollback();
+            return null;
+        }
 
-        $package = $this->packageModel->find($membership->package_id);
-        if (!$package) return null;
+        $package = $this->packageModel->findForTenant((int) $membership->package_id, (int) $membership->tenant_id);
+        if (!$package) {
+            $db->transRollback();
+            return null;
+        }
 
         // Create new membership starting from end date of current
-        $startDate = $membership->end_date;
+        $startDate = max(date('Y-m-d'), $membership->end_date);
         $endDate   = date('Y-m-d', strtotime($startDate . " +{$package->duration_days} days"));
 
         // Mark old as expired
@@ -89,20 +110,33 @@ class MembershipService
             'status'     => 'active',
         ];
 
-        return (int) $this->membershipModel->insert($data);
+        $newId = $this->membershipModel->insert($data);
+        if (! $newId) {
+            $db->transRollback();
+            return null;
+        }
+        $db->transComplete();
+        return $db->transStatus() ? (int) $newId : null;
     }
 
-    public function cancel(int $membershipId): bool
+    public function cancel(int $membershipId, ?int $tenantId = null): bool
     {
-        $membership = $this->membershipModel->find($membershipId);
-        if (!$membership || $membership->status !== 'active') return false;
+        $db = \Config\Database::connect();
+        $db->transStart();
+        $membership = $this->membershipModel->findForUpdate($membershipId, $tenantId);
+        if (!$membership || $membership->status !== 'active') {
+            $db->transRollback();
+            return false;
+        }
 
-        return $this->membershipModel->update($membershipId, ['status' => 'cancelled']);
+        $updated = $this->membershipModel->update($membershipId, ['status' => 'cancelled']);
+        $db->transComplete();
+        return $updated && $db->transStatus();
     }
 
-    public function checkActiveMembership(int $playerId): bool
+    public function checkActiveMembership(int $playerId, ?int $tenantId = null): bool
     {
-        $membership = $this->membershipModel->getActiveByPlayer($playerId);
+        $membership = $this->membershipModel->getActiveByPlayer($playerId, $tenantId);
         return $membership !== null;
     }
 
@@ -111,9 +145,9 @@ class MembershipService
         return $this->membershipModel->getActiveByPlayer($playerId, $tenantId);
     }
 
-    public function getPlayerMemberships(int $playerId)
+    public function getPlayerMemberships(int $playerId, ?int $tenantId = null)
     {
-        return $this->membershipModel->getByPlayer($playerId);
+        return $this->membershipModel->getByPlayer($playerId, $tenantId);
     }
 
     public function getMemberships(int $tenantId, array $filters = [])
@@ -133,23 +167,32 @@ class MembershipService
 
     public function createPackage(array $data): ?int
     {
+        if ((int) ($data['tenant_id'] ?? 0) <= 0 || (int) ($data['duration_days'] ?? 0) <= 0 || (float) ($data['price'] ?? 0) < 0) {
+            return null;
+        }
         $id = $this->packageModel->insert($data);
         return $id ? (int) $id : null;
     }
 
-    public function updatePackage(int $id, array $data): bool
+    public function updatePackage(int $id, array $data, ?int $tenantId = null): bool
     {
+        if ($tenantId !== null && ! $this->packageModel->findForTenant($id, $tenantId)) {
+            return false;
+        }
         return $this->packageModel->update($id, $data);
     }
 
-    public function deletePackage(int $id): bool
+    public function deletePackage(int $id, ?int $tenantId = null): bool
     {
+        if ($tenantId !== null && ! $this->packageModel->findForTenant($id, $tenantId)) {
+            return false;
+        }
         return $this->packageModel->delete($id);
     }
 
-    public function getPackageById(int $id)
+    public function getPackageById(int $id, ?int $tenantId = null)
     {
-        return $this->packageModel->find($id);
+        return $tenantId === null ? $this->packageModel->find($id) : $this->packageModel->findForTenant($id, $tenantId);
     }
 
     public function expireOverdueMemberships(): int

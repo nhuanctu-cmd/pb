@@ -27,4 +27,12 @@ class TournamentCategoryModel extends Model
             ->orderBy('id', 'ASC')
             ->findAll();
     }
+
+    public function findForTenant(int $categoryId, int $tenantId): ?object
+    {
+        return $this->where('id', $categoryId)
+            ->where('tenant_id', $tenantId)
+            ->where('deleted_at', null)
+            ->first();
+    }
 }

@@ -22,7 +22,8 @@ class UserApi extends BaseController
 
     public function show(int $id)
     {
-        $user = $id > 0 ? $this->userModel->find($id) : null;
+        $tenantId = (int) ($this->request->api_tenant_id ?? current_tenant_id() ?? 0);
+        $user = $id > 0 && $tenantId > 0 ? $this->userModel->findForTenant($id, $tenantId) : null;
         if (!$user) {
             return service('apiResponseService')->notFound();
         }

@@ -12,7 +12,7 @@
 </head>
 <body>
 <?php $shareUrl = current_url(); ?>
-<?php $heroImage = $tournament->banner ?: '/assets/img/tournament-fallback.png'; ?>
+<?php $heroImage = $tournament->banner ?: asset_url('assets/img/tournament-fallback.png'); ?>
 <header class="hero has-image" style="background-image:url('<?= esc($heroImage) ?>')">
     <div class="hero-shade">
         <div class="container">

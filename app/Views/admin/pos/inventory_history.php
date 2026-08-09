@@ -1,3 +1,5 @@
+<?= $this->extend('layouts/admin_master') ?>
+<?= $this->section('content') ?>
 <!-- Inventory History Page -->
 <div class="container-fluid">
     <div class="row mb-3">
@@ -86,3 +88,4 @@ $(document).ready(function() {
     });
 });
 </script>
+<?= $this->endSection() ?>

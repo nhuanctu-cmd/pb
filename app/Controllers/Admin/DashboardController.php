@@ -16,14 +16,27 @@ class DashboardController extends BaseController
         $branchModel = new BranchModel();
         $userModel = new UserModel();
         $auditLogModel = new AuditLogModel();
+        $operationsDashboard = service('operationsDashboardService');
 
         $tenantId = current_tenant_id();
+        $tenantId = $tenantId ? (int) $tenantId : 0;
 
         $this->viewData['pageTitle'] = 'Dashboard';
-        $this->viewData['totalTenants'] = $tenantModel->where('deleted_at', null)->countAllResults();
-        $this->viewData['totalBranches'] = $branchModel->where('deleted_at', null)->countAllResults();
-        $this->viewData['totalUsers'] = $userModel->where('deleted_at', null)->countAllResults();
-        $this->viewData['recentActivities'] = $auditLogModel->orderBy('created_at', 'DESC')->limit(10)->findAll();
+        // The admin UI is tenant-contextual. Never fall back to a global
+        // aggregate when the current tenant is missing.
+        $this->viewData['totalTenants'] = $tenantId > 0
+            ? $tenantModel->where('id', $tenantId)->where('deleted_at', null)->countAllResults()
+            : 0;
+        $this->viewData['totalBranches'] = $tenantId > 0
+            ? $branchModel->where('tenant_id', $tenantId)->where('deleted_at', null)->countAllResults()
+            : 0;
+        $this->viewData['totalUsers'] = $tenantId > 0
+            ? $userModel->where('tenant_id', $tenantId)->where('deleted_at', null)->countAllResults()
+            : 0;
+        $this->viewData['recentActivities'] = $tenantId > 0
+            ? $auditLogModel->where('tenant_id', $tenantId)->orderBy('created_at', 'DESC')->limit(10)->findAll()
+            : [];
+        $this->viewData['operations'] = $tenantId > 0 ? $operationsDashboard->get($tenantId, $this->request->getGet('date')) : [];
 
         return $this->render('admin/dashboard', $this->viewData);
     }

@@ -58,7 +58,7 @@ class Tournaments extends BaseController
 
     public function edit(int $id)
     {
-        $tournament = $this->tournamentModel->find($id);
+        $tournament = $this->tournamentModel->findForTenant($id, (int) current_tenant_id());
         if (! $tournament) {
             return redirect()->to('/admin/tournaments')->with('error', 'Không tìm thấy giải đấu.');
         }
@@ -68,7 +68,9 @@ class Tournaments extends BaseController
 
     public function update(int $id)
     {
-        $result = $this->tournamentService->updateTournament($id, $this->payload((int) current_tenant_id()));
+        $result = $this->tournamentService->updateTournament(
+            $id, $this->payload((int) current_tenant_id()), (int) current_tenant_id()
+        );
         if ($result['success']) {
             return redirect()->to('/admin/tournaments/show/' . $id)->with('success', $result['message']);
         }
@@ -102,31 +104,31 @@ class Tournaments extends BaseController
 
     public function approveRegistration(int $id)
     {
-        $result = $this->registrationService->approveRegistration($id);
+        $result = $this->registrationService->approveRegistration($id, (int) current_tenant_id());
         return redirect()->back()->with($result['success'] ? 'success' : 'error', $result['message']);
     }
 
     public function rejectRegistration(int $id)
     {
-        $result = $this->registrationService->rejectRegistration($id, $this->request->getPost('note'));
+        $result = $this->registrationService->rejectRegistration($id, $this->request->getPost('note'), (int) current_tenant_id());
         return redirect()->back()->with($result['success'] ? 'success' : 'error', $result['message']);
     }
 
     public function open(int $id)
     {
-        $result = $this->tournamentService->openRegistration($id);
+        $result = $this->tournamentService->openRegistration($id, (int) current_tenant_id());
         return redirect()->back()->with($result['success'] ? 'success' : 'error', $result['message']);
     }
 
     public function close(int $id)
     {
-        $result = $this->tournamentService->closeRegistration($id);
+        $result = $this->tournamentService->closeRegistration($id, (int) current_tenant_id());
         return redirect()->back()->with($result['success'] ? 'success' : 'error', $result['message']);
     }
 
     public function cancel(int $id)
     {
-        $result = $this->tournamentService->cancelTournament($id);
+        $result = $this->tournamentService->cancelTournament($id, (int) current_tenant_id());
         return redirect()->back()->with($result['success'] ? 'success' : 'error', $result['message']);
     }
 
@@ -148,7 +150,7 @@ class Tournaments extends BaseController
 
     private function detailData(int $id): ?array
     {
-        $tournament = $this->tournamentModel->find($id);
+        $tournament = $this->tournamentModel->findForTenant($id, (int) current_tenant_id());
         if (! $tournament) {
             return null;
         }

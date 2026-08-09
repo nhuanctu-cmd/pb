@@ -45,4 +45,16 @@ class PosOrderModel extends Model
             ->where('pos_orders.id', $orderId)
             ->first();
     }
+
+    public function findForUpdate(int $orderId, ?int $tenantId = null): ?array
+    {
+        $sql = 'SELECT * FROM pos_orders WHERE id = ?';
+        $params = [$orderId];
+        if ($tenantId !== null) {
+            $sql .= ' AND tenant_id = ?';
+            $params[] = $tenantId;
+        }
+        $sql .= ' LIMIT 1 FOR UPDATE';
+        return $this->db->query($sql, $params)->getRowArray() ?: null;
+    }
 }

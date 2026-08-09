@@ -52,15 +52,15 @@
 | M1 | Core: Tenant + Auth + RBAC + SaaS Plan | ✅ **HOÀN THÀNH** (09/08/2026) |
 | M2 | Common: Settings + Media + Audit + Notification Engine | ✅ **HOÀN THÀNH** (09/08/2026) |
 | M3 | Facility (cụm sân/chi nhánh/sân/giá) | ✅ **HOÀN THÀNH** (09/08/2026) |
-| M4 | Booking hoàn chỉnh | ⬜ |
-| M5 | Payment & Ví | ⬜ |
-| M6 | Membership | ⬜ |
-| M7 | Player Portal & Social | ⬜ |
-| M8 | Tournament & Live Score | ⬜ |
-| M9 | POS & Kho | ⬜ |
-| M10 | Báo cáo & Dashboard | ⬜ |
-| M11 | API & Tích hợp | ⬜ |
-| M12 | Community + AI + Livestream | ⬜ |
+| M4 | Booking hoàn chỉnh | ✅ **NỀN TẢNG HOÀN THÀNH** |
+| M5 | Payment & Ví | ✅ **NỀN TẢNG HOÀN THÀNH** |
+| M6 | Membership | ✅ **HOÀN THÀNH** |
+| M7 | Player Portal & Social | ✅ **HOÀN THÀNH** |
+| M8 | Tournament & Live Score | ✅ **NỀN TẢNG HOÀN THÀNH** |
+| M9 | POS & Kho | ✅ **HOÀN THÀNH** |
+| M10 | Báo cáo & Dashboard | ✅ **HOÀN THÀNH** |
+| M11 | API & Tích hợp | ✅ **NỀN TẢNG HOÀN THÀNH** |
+| M12 | Community + AI + Livestream | 🚧 Community hoàn thành nền tảng; AI/Livestream chờ adapter triển khai |
 
 ---
 
@@ -401,4 +401,66 @@ Hoàn tất A → L: nhiều tenant/chi nhánh, API mobile, tích hợp thanh to
 - API bearer token ký HMAC bằng encryption key; token bị sửa sẽ bị từ chối.
 - 86 test / 255 assertion đạt; test state machine, tamper token và branch regression đã được bổ sung.
 
-Việc tiếp theo theo thứ tự rủi ro: Payment Ledger + idempotency key, refund policy, rồi mới mở rộng waitlist/recurring booking.
+Payment Ledger, idempotency key, refund policy, recurring booking và waitlist đã được triển khai theo thứ tự rủi ro; các cụm tiếp theo tập trung vào walk-in, vận hành nhân sự và báo cáo sâu.
+
+Payment Ledger và Wallet đã được harden tiếp:
+
+- Payment/invoice/refund truy cập theo tenant và khóa invoice khi ghi nhận tiền.
+- Idempotency retry trả lại kết quả cũ, không tạo payment hoặc cộng số dư lần hai.
+- Refund được phân bổ theo từng payment, không vượt net paid balance.
+- Wallet topup/payment/refund/adjust dùng một transaction ledger thống nhất và row-lock.
+- Không cho số dư âm; player dashboard/admin player lookup đã ràng buộc tenant.
+
+Membership entitlement cũng đã được khóa:
+
+- Buy/renew/cancel dùng tenant-scoped lookup và row-lock cho membership hiện tại.
+- Package ID không còn có thể sửa/xóa xuyên tenant từ admin.
+- Player membership history, pricing discount và profile cancellation đều giữ tenant context.
+- Ngày renew quá hạn tự tính lại từ hôm nay, không tạo quyền lợi đã hết hạn.
+
+POS/Kho đã được harden:
+
+- Order load/cancel/checkout và item read được giới hạn theo tenant.
+- Checkout khóa order, bắt buộc đủ tiền, chỉ trừ kho một lần và không checkout lại order đã hoàn tất.
+- Inventory mutation dùng row-lock; inventory/movement model đã khớp khóa chính và cột audit timestamp thực tế.
+- Product và booking/player attach đều kiểm tra tenant context.
+
+Tournament core cũng đã được gia cố:
+
+- Tournament create/update/status transition kiểm tra branch và tenant.
+- State flow draft → open → closed/running → completed/cancelled được kiểm soát.
+- Admin edit/detail/open/close/cancel không còn truy cập tournament ngoài tenant.
+- Registration approve/reject/invoice và category limit cũng giữ tenant context; player đăng ký phải thuộc cùng tenant.
+
+API, vận hành và cộng đồng đã được harden tiếp:
+
+- Facility/Branch/Court/Device/Setting API kiểm tra tenant theo toàn bộ quan hệ ID; toggle thiết bị bắt buộc `apiauth`.
+- API tenant/user/profile/booking/check-in/live score/scheduler không còn fallback truy cập chéo tenant khi thiếu context.
+- Queue reserve dùng transaction + `FOR UPDATE`; notification center lọc theo tenant.
+- Dashboard/report lọc tenant; revenue theo court chỉ tính item active, booking cùng tenant và court đúng branch.
+- Tournament scheduler và scoring khóa category/match/court theo tenant; social matching kiểm tra player/branch, xung đột lịch và row-lock khi confirm.
+- POS đọc setting `allow_negative_stock` theo tenant thay vì hard-code.
+- Recurring booking đã có template engine: tạo occurrence theo daily/weekly/biweekly/monthly/custom, loại trừ ngày, pause/cancel, xử lý due bằng row-lock và tạo booking trong transaction.
+- Menu và admin route `/admin/recurring-bookings` đã được nối vào RBAC `bookings.view`.
+- Waitlist đã có migration rollback được, tenant-scoped idempotency, ưu tiên hàng đợi, notify/expire/cancel và claim booking atomically bằng row-lock.
+- Menu và admin route `/admin/waitlist` đã được nối vào RBAC `bookings.view`.
+- Walk-in đã có bảng phiên riêng liên kết booking, idempotency key, hỗ trợ player/guest, check-in, checkout, cancel và menu quầy vận hành.
+- Operational Dashboard đã hiển thị KPI booking/doanh thu/đã thu, lịch sắp diễn ra, trạng thái sân, walk-in và waitlist theo tenant.
+- Báo cáo vận hành đã có lọc ngày/chi nhánh, tổng hợp booking/doanh thu/đã thu và xuất CSV theo tenant.
+- Conflict bảo trì đã xử lý đúng interval mở và interval kề nhau; availability/booking không nhận sân đang bảo trì.
+- Open Play đã có session, host, visibility, level range, capacity, join/request, waitlist, approve/leave với tenant boundary và row-lock; player-facing flow đã nối vào navbar/routes.
+- Matching request đã có validation, khóa player khi confirm, re-check conflict trong transaction, cancel service và audit.
+- Rotation Engine đã lưu round, partner/opponent history và thời gian chờ; migration waitlist, walk-in, Open Play và rotation đã chạy trên database phát triển.
+- Social Graph đã có follow/unfollow player, favorite club/court/Open Play, tenant-scoped unique relation và player page `/player/social`.
+- Coach/Clinic đã có migration, hồ sơ coach, availability, blackout, private/semi-private/group/clinic session, giữ sân qua BookingService, capacity/waitlist, duyệt/hủy, player route/menu và audit.
+- Competition đã có migration riêng, format round-robin/league/ladder, participant team/player, sinh fixture deterministic, ghi kết quả có row-lock, standings điểm/hiệu số và player route/menu.
+- Growth đã có promotion quote/redeem idempotent tích hợp BookingService, referral qualify/reward qua wallet ledger, review moderation, tenant validation và menu admin/player.
+- Player booking form đã nhận promotion code và lưu discount/net amount theo booking snapshot.
+- Coaching và Competition đã có attendance/check-in persistence, admin controls, row-lock cập nhật và audit.
+- Operations Dashboard đã bổ sung KPI Coach–Clinic và Competition theo ngày/tenant bên cạnh booking, walk-in và waitlist.
+- Ladder đã có challenge tối đa 2 bậc, accept/reject, hết hạn, ghi kết quả, tạo fixture, cập nhật standings và promotion trong transaction; challenge được audit và notify player đối thủ.
+- Coaching session được tự tạo invoice khi approve; player có thể thanh toán phần còn lại bằng wallet với tenant check, payer check và idempotency key.
+- API mobile đã có coaching sessions/join/pay và competition list/detail/ladder response dưới `apiauth`; dashboard/report bổ sung hóa đơn, đã thu và công nợ.
+- API có rate-limit filter 120 request/phút theo client identity, phản hồi 429/Retry-After và contract được ghi tại `docs/OPENAPI.md`.
+- Community đã có post/comment/reaction, tenant-scoped feed, player menu, API mobile, transaction và audit; AI scheduling/livestream cần provider/credentials thực tế.
+- Full test hiện tại: 124 tests, 342 assertions; migration đã chạy đến `2026-08-09-270000`.

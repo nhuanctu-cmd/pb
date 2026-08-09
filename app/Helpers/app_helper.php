@@ -291,6 +291,22 @@ if (!function_exists('format_money')) {
     }
 }
 
+if (!function_exists('asset_url')) {
+    /**
+     * Build a public asset URL that also works when the app is installed in
+     * a subdirectory, such as /BP/pickball-system/public.
+     */
+    function asset_url(string $path = ''): string
+    {
+        $scriptName = str_replace(['\\', '\\/'], '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+        $scriptName = preg_replace('#/+#', '/', $scriptName) ?: '';
+        $basePath = str_replace('\\', '/', dirname($scriptName));
+        $basePath = $basePath === '.' || $basePath === '/' ? '' : rtrim($basePath, '/');
+
+        return ($basePath ?: '') . '/' . ltrim($path, '/');
+    }
+}
+
 if (!function_exists('renderTimelineItem')) {
     function renderTimelineItem(string $title, ?string $time = null, string $tone = 'info', ?string $description = null): string
     {

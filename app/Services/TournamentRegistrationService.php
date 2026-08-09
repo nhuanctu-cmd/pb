@@ -35,14 +35,18 @@ class TournamentRegistrationService
         return $this->createRegistration($data);
     }
 
-    public function approveRegistration(int $registrationId): array
+    public function approveRegistration(int $registrationId, ?int $tenantId = null): array
     {
-        $registration = $this->registrationModel->find($registrationId);
+        $builder = $this->registrationModel->where('id', $registrationId);
+        if ($tenantId !== null) {
+            $builder->where('tenant_id', $tenantId);
+        }
+        $registration = $builder->first();
         if (! $registration) {
             return ['success' => false, 'message' => 'Không tìm thấy đăng ký.'];
         }
 
-        if (! $this->checkCategoryLimit((int) $registration->category_id)) {
+        if (! $this->checkCategoryLimit((int) $registration->category_id, $tenantId ?? (int) $registration->tenant_id)) {
             return ['success' => false, 'message' => 'Hạng mục đã đủ số lượng.'];
         }
 
@@ -50,9 +54,13 @@ class TournamentRegistrationService
         return ['success' => true, 'message' => 'Đã duyệt đăng ký.'];
     }
 
-    public function rejectRegistration(int $registrationId, ?string $note = null): array
+    public function rejectRegistration(int $registrationId, ?string $note = null, ?int $tenantId = null): array
     {
-        $registration = $this->registrationModel->find($registrationId);
+        $builder = $this->registrationModel->where('id', $registrationId);
+        if ($tenantId !== null) {
+            $builder->where('tenant_id', $tenantId);
+        }
+        $registration = $builder->first();
         if (! $registration) {
             return ['success' => false, 'message' => 'Không tìm thấy đăng ký.'];
         }
@@ -65,25 +73,33 @@ class TournamentRegistrationService
         return ['success' => true, 'message' => 'Đã từ chối đăng ký.'];
     }
 
-    public function checkCategoryLimit(int $categoryId): bool
+    public function checkCategoryLimit(int $categoryId, ?int $tenantId = null): bool
     {
-        $category = $this->categoryModel->find($categoryId);
+        $categoryQuery = $this->categoryModel->where('id', $categoryId);
+        if ($tenantId !== null) {
+            $categoryQuery->where('tenant_id', $tenantId);
+        }
+        $category = $categoryQuery->first();
         if (! $category || empty($category->max_teams)) {
             return true;
         }
 
-        return $this->registrationModel->countApprovedByCategory($categoryId) < (int) $category->max_teams;
+        return $this->registrationModel->countApprovedByCategory($categoryId, $tenantId) < (int) $category->max_teams;
     }
 
-    public function createRegistrationInvoice(int $registrationId): array
+    public function createRegistrationInvoice(int $registrationId, ?int $tenantId = null): array
     {
-        $registration = $this->registrationModel->find($registrationId);
+        $builder = $this->registrationModel->where('id', $registrationId);
+        if ($tenantId !== null) {
+            $builder->where('tenant_id', $tenantId);
+        }
+        $registration = $builder->first();
         if (! $registration) {
             return ['success' => false, 'message' => 'Không tìm thấy đăng ký.'];
         }
 
-        $category = $this->categoryModel->find((int) $registration->category_id);
-        $tournament = $this->tournamentModel->find((int) $registration->tournament_id);
+        $category = $this->categoryModel->where('id', $registration->category_id)->where('tenant_id', $registration->tenant_id)->first();
+        $tournament = $this->tournamentModel->findForTenant((int) $registration->tournament_id, (int) $registration->tenant_id);
         $amount = (float) ($category->registration_fee ?? $tournament->registration_fee ?? 0);
         $invoiceCode = 'TRN-' . date('ymd') . '-' . str_pad((string) $registrationId, 5, '0', STR_PAD_LEFT);
 
@@ -97,8 +113,9 @@ class TournamentRegistrationService
 
     private function createRegistration(array $data): array
     {
-        $tournament = $this->tournamentModel->find((int) $data['tournament_id']);
-        $category = $this->categoryModel->find((int) $data['category_id']);
+        $tenantId = (int) ($data['tenant_id'] ?? 0);
+        $tournament = $this->tournamentModel->findForTenant((int) $data['tournament_id'], $tenantId);
+        $category = $this->categoryModel->where('id', (int) $data['category_id'])->where('tenant_id', $tenantId)->first();
 
         if (! $tournament || ! $category || (int) $category->tournament_id !== (int) $tournament->id) {
             return ['success' => false, 'message' => 'Thông tin giải hoặc hạng mục không hợp lệ.'];
@@ -110,6 +127,13 @@ class TournamentRegistrationService
 
         if ($tournament->registration_end && strtotime($tournament->registration_end) < time()) {
             return ['success' => false, 'message' => 'Đã hết hạn đăng ký.'];
+        }
+
+        if (! empty($data['player_id'])) {
+            $player = $this->playerModel->where('id', $data['player_id'])->where('tenant_id', $tenantId)->first();
+            if (! $player) {
+                return ['success' => false, 'message' => 'Vận động viên không thuộc tenant.'];
+            }
         }
 
         $registrationId = $this->registrationModel->insert([
@@ -129,7 +153,7 @@ class TournamentRegistrationService
             return ['success' => false, 'message' => 'Không gửi được đăng ký.'];
         }
 
-        $invoice = $this->createRegistrationInvoice((int) $registrationId);
+        $invoice = $this->createRegistrationInvoice((int) $registrationId, (int) $tournament->tenant_id);
 
         return [
             'success' => true,

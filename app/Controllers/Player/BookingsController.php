@@ -56,6 +56,7 @@ class BookingsController extends BaseController
 
         return view('player/bookings/create', [
             'branches' => $branches,
+            'today'    => date('Y-m-d'),
             'step'     => 1,
         ]);
     }
@@ -80,6 +81,34 @@ class BookingsController extends BaseController
     }
 
     /**
+     * Return court positions and availability for a Monday-Sunday window.
+     */
+    public function weekAvailability()
+    {
+        $branchId = (int) $this->request->getGet('branch_id');
+        $weekStart = (string) ($this->request->getGet('week_start') ?: date('Y-m-d'));
+        $tenantId = (int) session()->get('tenant_id');
+
+        if (! $branchId || ! $this->branchModel->findForTenant($branchId, $tenantId)) {
+            return $this->response->setStatusCode(422)->setJSON([
+                'success' => false,
+                'message' => lang('App.invalid_data'),
+            ]);
+        }
+
+        try {
+            $data = $this->bookingService->getWeeklyAvailability($branchId, $weekStart, $tenantId);
+        } catch (\InvalidArgumentException $exception) {
+            return $this->response->setStatusCode(422)->setJSON([
+                'success' => false,
+                'message' => lang('App.invalid_data'),
+            ]);
+        }
+
+        return $this->response->setJSON(['success' => true, 'data' => $data]);
+    }
+
+    /**
      * Store booking - Step 3: Confirm & submit
      */
     public function store()
@@ -99,6 +128,8 @@ class BookingsController extends BaseController
             'end_time'       => $this->request->getPost('end_time'),
             'source'         => 'player_portal',
             'note'           => $this->request->getPost('note'),
+            'promotion_code' => trim((string) $this->request->getPost('promotion_code')) ?: null,
+            'promotion_idempotency_key' => 'booking-' . bin2hex(random_bytes(8)),
             'created_by'     => $playerId,
             'items'          => [],
         ];

@@ -66,7 +66,7 @@ class MembershipsController extends BaseController
 
     public function cancel(int $id)
     {
-        if ($this->membershipService->cancel($id)) {
+        if ($this->membershipService->cancel($id, (int) current_tenant_id())) {
             return redirect()->to('/admin/memberships')->with('success', lang('App.membership_cancelled'));
         }
 
@@ -123,7 +123,7 @@ class MembershipsController extends BaseController
 
     public function editPackage(int $id)
     {
-        $package = $this->membershipService->getPackageById($id);
+        $package = $this->membershipService->getPackageById($id, (int) current_tenant_id());
         if (!$package) {
             return redirect()->to('/admin/memberships/packages')->with('error', lang('App.no_data'));
         }
@@ -136,7 +136,7 @@ class MembershipsController extends BaseController
 
     public function updatePackage(int $id)
     {
-        $package = $this->membershipService->getPackageById($id);
+        $package = $this->membershipService->getPackageById($id, (int) current_tenant_id());
         if (!$package) {
             return redirect()->to('/admin/memberships/packages')->with('error', lang('App.no_data'));
         }
@@ -162,7 +162,7 @@ class MembershipsController extends BaseController
             'updated_by'       => user_id(),
         ];
 
-        if ($this->membershipService->updatePackage($id, $data)) {
+        if ($this->membershipService->updatePackage($id, $data, (int) current_tenant_id())) {
             return redirect()->to('/admin/memberships/packages')->with('success', lang('App.package_updated'));
         }
 
@@ -171,7 +171,7 @@ class MembershipsController extends BaseController
 
     public function deletePackage(int $id)
     {
-        if ($this->membershipService->deletePackage($id)) {
+        if ($this->membershipService->deletePackage($id, (int) current_tenant_id())) {
             return redirect()->to('/admin/memberships/packages')->with('success', lang('App.package_deleted'));
         }
 

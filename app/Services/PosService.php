@@ -21,6 +21,7 @@ class PosService
     protected PlayerModel $playerModel;
     protected ProductCategoryModel $categoryModel;
     protected InventoryService $inventoryService;
+    protected SettingService $settingService;
 
     private ?array $currentOrder = null;
 
@@ -33,6 +34,7 @@ class PosService
         $this->playerModel = new PlayerModel();
         $this->categoryModel = new ProductCategoryModel();
         $this->inventoryService = new InventoryService();
+        $this->settingService = new SettingService();
     }
 
     /**
@@ -40,6 +42,9 @@ class PosService
      */
     public function createOrder(int $tenantId, int $branchId, ?int $userId = null): array
     {
+        if ($tenantId <= 0 || $branchId <= 0) {
+            throw new \InvalidArgumentException('Tenant and branch are required');
+        }
         $orderCode = $this->generateOrderCode($tenantId, $branchId);
 
         $orderData = [
@@ -73,9 +78,11 @@ class PosService
     /**
      * Load existing order
      */
-    public function loadOrder(int $orderId): ?array
+    public function loadOrder(int $orderId, ?int $tenantId = null): ?array
     {
-        $this->currentOrder = $this->orderModel->find($orderId);
+        $this->currentOrder = $tenantId === null
+            ? $this->orderModel->find($orderId)
+            : $this->orderModel->where('id', $orderId)->where('tenant_id', $tenantId)->first();
         return $this->currentOrder;
     }
 
@@ -88,7 +95,11 @@ class PosService
             throw new \InvalidArgumentException('No active order. Create order first.');
         }
 
-        $product = $this->productModel->find($productId);
+        if ($quantity <= 0 || (int) $this->currentOrder['tenant_id'] !== $tenantId) {
+            throw new \InvalidArgumentException('Invalid order context or quantity');
+        }
+
+        $product = $this->productModel->where('id', $productId)->where('tenant_id', $tenantId)->first();
         if (!$product || $product['status'] !== 'active') {
             throw new \InvalidArgumentException('Product not found or inactive');
         }
@@ -120,19 +131,24 @@ class PosService
                 $newQty = $existingItem['quantity'] + $quantity;
                 $total = $newQty * $product['sale_price'];
 
-                $this->itemModel->update($existingItem['id'], [
+                if (! $this->itemModel->update($existingItem['id'], [
                     'quantity' => $newQty,
                     'total' => $total,
-                ]);
+                ])) {
+                    throw new \RuntimeException('POS item could not be updated: ' . json_encode($this->itemModel->errors()));
+                }
             } else {
-                $this->itemModel->insert([
+                if (! $this->itemModel->insert([
                     'tenant_id'  => $tenantId,
                     'order_id'   => $this->currentOrder['id'],
                     'product_id' => $productId,
                     'quantity'   => $quantity,
                     'price'      => $product['sale_price'],
                     'total'      => $quantity * $product['sale_price'],
-                ]);
+                    'created_at' => date('Y-m-d H:i:s'),
+                ])) {
+                    throw new \RuntimeException('POS item could not be created: ' . json_encode($this->itemModel->errors()));
+                }
             }
 
             // Recalculate order totals
@@ -194,7 +210,13 @@ class PosService
         }
 
         // Check stock
-        $product = $this->productModel->find($item['product_id']);
+        $product = $this->productModel
+            ->where('id', $item['product_id'])
+            ->where('tenant_id', $this->currentOrder['tenant_id'])
+            ->first();
+        if (! $product || $product['status'] !== 'active') {
+            throw new \InvalidArgumentException('Product not found or inactive');
+        }
 
         if (!$this->isNegativeStockAllowed($this->currentOrder['tenant_id'])) {
             // For update, we check if the additional quantity needed is available
@@ -243,7 +265,7 @@ class PosService
     /**
      * Checkout order (thanh toán)
      */
-    public function checkout(int $paidAmount, ?string $note = null): bool
+    public function checkout(float $paidAmount, ?string $note = null): bool
     {
         if (!$this->currentOrder) {
             throw new \InvalidArgumentException('No active order');
@@ -251,6 +273,11 @@ class PosService
 
         if ($this->currentOrder['status'] !== 'pending') {
             throw new \InvalidArgumentException('Order already processed');
+        }
+
+        $paidAmount = round((float) $paidAmount, 2);
+        if ($paidAmount < (float) $this->currentOrder['total_amount']) {
+            throw new \InvalidArgumentException('Paid amount is less than order total');
         }
 
         $items = $this->itemModel->where('order_id', $this->currentOrder['id'])->findAll();
@@ -262,6 +289,17 @@ class PosService
         $db->transStart();
 
         try {
+            $lockedOrder = $this->orderModel->findForUpdate(
+                (int) $this->currentOrder['id'], (int) $this->currentOrder['tenant_id']
+            );
+            if (! $lockedOrder || $lockedOrder['status'] !== 'pending') {
+                throw new \InvalidArgumentException('Order already processed');
+            }
+            $this->currentOrder = $lockedOrder;
+            if ($paidAmount < (float) $this->currentOrder['total_amount']) {
+                throw new \InvalidArgumentException('Paid amount is less than order total');
+            }
+            $items = $this->itemModel->where('order_id', $this->currentOrder['id'])->findAll();
             // Deduct stock for each item
             foreach ($items as $item) {
                 $movementRefId = $this->currentOrder['id'];
@@ -298,19 +336,20 @@ class PosService
     /**
      * Cancel order and restore stock
      */
-    public function cancelOrder(int $orderId, ?string $reason = null): bool
+    public function cancelOrder(int $orderId, ?string $reason = null, ?int $tenantId = null): bool
     {
-        $order = $this->orderModel->find($orderId);
+        $db = \Config\Database::connect();
+        $db->transStart();
+        $order = $this->orderModel->findForUpdate($orderId, $tenantId);
         if (!$order) {
+            $db->transRollback();
             throw new \InvalidArgumentException('Order not found');
         }
 
         if ($order['status'] === 'cancelled') {
+            $db->transRollback();
             throw new \InvalidArgumentException('Order already cancelled');
         }
-
-        $db = \Config\Database::connect();
-        $db->transStart();
 
         try {
             // If order was completed, restore stock
@@ -337,7 +376,7 @@ class PosService
                 'updated_at' => date('Y-m-d H:i:s'),
             ]);
 
-            if ($this->currentOrder && $this->currentOrder['id'] == $orderId) {
+        if ($this->currentOrder && $this->currentOrder['id'] == $orderId) {
                 $this->currentOrder = $this->orderModel->find($orderId);
             }
 
@@ -358,7 +397,7 @@ class PosService
             throw new \InvalidArgumentException('No active order');
         }
 
-        $booking = $this->bookingModel->find($bookingId);
+        $booking = $this->bookingModel->findForTenant($bookingId, (int) $this->currentOrder['tenant_id']);
         if (!$booking) {
             throw new \InvalidArgumentException('Booking not found');
         }
@@ -381,7 +420,10 @@ class PosService
             throw new \InvalidArgumentException('No active order');
         }
 
-        $player = $this->playerModel->find($playerId);
+        $player = $this->playerModel
+            ->where('id', $playerId)
+            ->where('tenant_id', $this->currentOrder['tenant_id'])
+            ->first();
         if (!$player) {
             throw new \InvalidArgumentException('Player not found');
         }
@@ -424,22 +466,8 @@ class PosService
      */
     protected function generateOrderCode(int $tenantId, int $branchId): string
     {
-        $date = date('Ymd');
-        $prefix = "POS{$tenantId}{$branchId}{$date}";
-
-        $lastOrder = $this->orderModel
-            ->where('order_code LIKE', $prefix . '%')
-            ->orderBy('id', 'DESC')
-            ->first();
-
-        if ($lastOrder) {
-            $lastNumber = (int)substr($lastOrder['order_code'], -6);
-            $newNumber = $lastNumber + 1;
-        } else {
-            $newNumber = 1;
-        }
-
-        return $prefix . str_pad($newNumber, 6, '0', STR_PAD_LEFT);
+        return 'POS' . $tenantId . $branchId . date('YmdHis')
+            . strtoupper(bin2hex(random_bytes(4)));
     }
 
     /**
@@ -447,9 +475,7 @@ class PosService
      */
     protected function isNegativeStockAllowed(int $tenantId): bool
     {
-        // TODO: Check tenant setting
-        // For now, default to false
-        return false;
+        return (bool) $this->settingService->get('allow_negative_stock', false, $tenantId);
     }
 
     /**
@@ -457,7 +483,10 @@ class PosService
      */
     public function getOrderItems(int $orderId): array
     {
-        return $this->itemModel->getByOrder($orderId);
+        return $this->itemModel->getByOrder(
+            $orderId,
+            $this->currentOrder ? (int) $this->currentOrder['tenant_id'] : null
+        );
     }
 
     /**
@@ -476,6 +505,7 @@ class PosService
                 ->where('products.category_id', $category['id'])
                 ->where('products.status', 'active')
                 ->where('inventories.branch_id', $branchId)
+                ->where('inventories.tenant_id', $tenantId)
                 ->groupBy('products.id')
                 ->findAll();
 
@@ -504,6 +534,7 @@ class PosService
                 ->orLike('products.sku', $keyword)
             ->groupEnd()
             ->where('inventories.branch_id', $branchId)
+            ->where('inventories.tenant_id', $tenantId)
             ->groupBy('products.id')
             ->findAll();
     }

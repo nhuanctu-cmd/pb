@@ -50,6 +50,53 @@ if (!function_exists('is_superadmin')) {
     }
 }
 
+if (!function_exists('can')) {
+    /**
+     * Kiểm tra quyền của user hiện tại (RBAC).
+     * Super admin luôn có mọi quyền. Hỗ trợ wildcard 'module.*'.
+     */
+    function can(string $permission): bool
+    {
+        if (is_superadmin()) {
+            return true;
+        }
+
+        $userId = user_id();
+        if (! $userId) {
+            return false;
+        }
+
+        $permissionService = new \App\Services\PermissionService();
+
+        if ($permissionService->hasPermission((int) $userId, $permission)) {
+            return true;
+        }
+
+        // Kiểm tra wildcard: 'bookings.create' khớp grant 'bookings.*'
+        if (str_contains($permission, '.')) {
+            $module = explode('.', $permission)[0];
+            return $permissionService->hasPermission((int) $userId, $module . '.*');
+        }
+
+        return false;
+    }
+}
+
+if (!function_exists('canAny')) {
+    /**
+     * Có ít nhất 1 quyền trong danh sách
+     */
+    function canAny(array $permissions): bool
+    {
+        foreach ($permissions as $permission) {
+            if (can($permission)) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
 if (!function_exists('current_tenant_id')) {
     function current_tenant_id(): ?int
     {

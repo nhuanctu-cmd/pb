@@ -12,11 +12,26 @@ class PermissionService
     protected RolePermissionModel $rolePermissionModel;
     protected UserRoleModel $userRoleModel;
 
+    /** Cache quyền trong cùng 1 request (tránh query lặp khi render menu/filter) */
+    private static array $userPermissionsCache = [];
+
     public function __construct()
     {
         $this->permissionModel     = new PermissionModel();
         $this->rolePermissionModel = new RolePermissionModel();
         $this->userRoleModel       = new UserRoleModel();
+    }
+
+    /**
+     * Xóa cache quyền của user (gọi khi đổi vai trò/quyền)
+     */
+    public static function clearCache(?int $userId = null): void
+    {
+        if ($userId === null) {
+            self::$userPermissionsCache = [];
+            return;
+        }
+        unset(self::$userPermissionsCache[$userId]);
     }
 
     public function getAllPermissions(): array
@@ -41,15 +56,23 @@ class PermissionService
 
     public function getUserPermissions(int $userId): array
     {
+        if (isset(self::$userPermissionsCache[$userId])) {
+            return self::$userPermissionsCache[$userId];
+        }
+
         $roleIds = $this->userRoleModel->getRoleIdsByUser($userId);
         $permissions = [];
         foreach ($roleIds as $roleId) {
             $rolePerms = $this->getPermissionsByRole($roleId);
             foreach ($rolePerms as $perm) {
-                $permissions[$perm->slug] = $perm;
+                $permSlug = is_object($perm) ? $perm->slug : ($perm['slug'] ?? null);
+                if ($permSlug) {
+                    $permissions[$permSlug] = $perm;
+                }
             }
         }
-        return $permissions;
+
+        return self::$userPermissionsCache[$userId] = $permissions;
     }
 
     public function hasPermission(int $userId, string $permissionSlug): bool

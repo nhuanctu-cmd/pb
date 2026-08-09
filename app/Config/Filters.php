@@ -28,6 +28,7 @@ class Filters extends BaseFilters
         'auth'          => \App\Filters\AuthFilter::class,
         'tenant'        => \App\Filters\TenantFilter::class,
         'permission'    => \App\Filters\PermissionFilter::class,
+        'plan'          => \App\Filters\PlanFilter::class,
         'apiauth'       => \App\Filters\ApiAuthFilter::class,
     ];
 

@@ -85,11 +85,14 @@
 | Nhân viên | `staff@pickleballpro.com` | `password` |
 | Demo Admin | `admin@demo-pickleball.vn` | `admin123` |
 
-### M1 — Core: Tenant + Auth + RBAC + SaaS Plan
+### M1 — Core: Tenant + Auth + RBAC + SaaS Plan ✅
 - Quên/đặt lại mật khẩu (email), `login_attempts` (chống brute-force), `password_histories`, `user_sessions`
-- Bảng `tenant_plans`, `tenant_subscriptions`, `tenant_usage` + giới hạn theo gói
-- Áp `TenantFilter` + `PermissionFilter` lên toàn bộ route admin
-- Sidebar menu theo quyền + 100% `lang()`; bỏ menu UI Demo
+- **RBAC chuẩn**: 68 permissions theo 22 module (ví dụ `bookings.create`, `pos.access`, `plans.view`) + 6 vai trò system (`super-admin/owner/branch-manager/staff/referee/player`)
+- Phân quyền đã đồng bộ: super-admin 68, owner 60, branch-manager 28, staff 14, referee 5, player 0
+- Helper `can()` + `canAny()` + menu sidebar tự động lọc theo quyền; route admin toàn bộ có filter `permission:module.action`
+- **Tài khoản demo đầy đủ**: admin, owner, manager, staff, referee, player
+- **SaaS hoàn chỉnh**: `PlanFilter` chặn POS/giải đấu nếu gói không có feature; trang `admin/plans` hiển thị gói hiện tại/usage/đăng ký; giới hạn tạo sân/ngườị chơi theo gói
+- Áp `TenantFilter` + `PermissionFilter` lên toàn bộ route admin; bỏ menu UI Demo
 
 ### M2 — Common: Settings + Media + Audit + Notification Engine
 - Bảng `notifications`, `notification_templates` (vi/en, đa kênh email/in-app)

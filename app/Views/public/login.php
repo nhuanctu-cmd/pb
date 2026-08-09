@@ -134,6 +134,8 @@
                                     ['role' => lang('Auth.roleOwner'),      'email' => 'owner@pickleballpro.com',     'password' => 'password'],
                                     ['role' => lang('Auth.roleManager'),    'email' => 'manager@pickleballpro.com',   'password' => 'password'],
                                     ['role' => lang('Auth.roleStaff'),      'email' => 'staff@pickleballpro.com',     'password' => 'password'],
+                                    ['role' => lang('Auth.roleReferee'),    'email' => 'referee@pickleballpro.com',   'password' => 'password'],
+                                    ['role' => lang('Auth.rolePlayer'),     'email' => 'player@pickleballpro.com',    'password' => 'password'],
                                 ];
                                 ?>
                                 <?php foreach ($demoAccounts as $acc): ?>

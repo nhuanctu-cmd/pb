@@ -32,6 +32,8 @@ return [
     'roleOwner'        => 'Court Owner',
     'roleManager'      => 'Branch Manager',
     'roleStaff'        => 'Staff',
+    'roleReferee'      => 'Referee',
+    'rolePlayer'       => 'Player',
 
     // Brute-force protection
     'loginLocked'        => 'Too many failed attempts. Please try again in {0} minutes.',

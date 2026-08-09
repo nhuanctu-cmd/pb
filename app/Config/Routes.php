@@ -113,7 +113,7 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
     $routes->group('', ['filter' => 'auth'], function ($routes) {
         $routes->get('dashboard', 'DashboardController::index');
 
-        $routes->group('ops', function ($routes) {
+        $routes->group('ops', ['filter' => 'permission:bookings.view'], function ($routes) {
             $routes->get('available-courts', 'OpsAjaxController::availableCourts');
             $routes->match(['get', 'post'], 'pricing-test', 'OpsAjaxController::pricingTest');
             $routes->get('booking-drawer/(:num)', 'OpsAjaxController::bookingDrawer/$1');
@@ -122,16 +122,8 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
             $routes->get('reschedule-preview/(:num)', 'OpsAjaxController::reschedulePreview/$1');
         });
 
-        // UI foundation demo routes
-        $routes->group('ui-demo', function ($routes) {
-            $routes->get('dashboard', 'UiDemoController::dashboard');
-            $routes->get('list', 'UiDemoController::list');
-            $routes->get('form', 'UiDemoController::form');
-            $routes->get('detail', 'UiDemoController::detail');
-        });
-
         // Facility routes (Cluster management)
-        $routes->group('facilities', function ($routes) {
+        $routes->group('facilities', ['filter' => 'permission:facilities.view'], function ($routes) {
             $routes->get('/', 'FacilitiesController::index');
             $routes->get('create', 'FacilitiesController::create');
             $routes->post('create', 'FacilitiesController::store');
@@ -153,7 +145,7 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
         });
 
         // Tenant routes
-        $routes->group('tenants', function ($routes) {
+        $routes->group('tenants', ['filter' => 'permission:tenants.view'], function ($routes) {
             $routes->get('/', 'TenantController::index');
             $routes->get('create', 'TenantController::create');
             $routes->post('create', 'TenantController::store');
@@ -165,7 +157,7 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
         });
 
         // Branch routes
-        $routes->group('branches', function ($routes) {
+        $routes->group('branches', ['filter' => 'permission:branches.view'], function ($routes) {
             $routes->get('/', 'BranchController::index');
             $routes->get('create', 'BranchController::create');
             $routes->post('create', 'BranchController::store');
@@ -175,7 +167,7 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
         });
 
         // User routes
-        $routes->group('users', function ($routes) {
+        $routes->group('users', ['filter' => 'permission:users.view'], function ($routes) {
             $routes->get('/', 'UserController::index');
             $routes->get('create', 'UserController::create');
             $routes->post('create', 'UserController::store');
@@ -185,7 +177,7 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
         });
 
         // Role routes
-        $routes->group('roles', function ($routes) {
+        $routes->group('roles', ['filter' => 'permission:roles.view'], function ($routes) {
             $routes->get('/', 'RoleController::index');
             $routes->get('create', 'RoleController::create');
             $routes->post('create', 'RoleController::store');
@@ -197,13 +189,13 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
         });
 
         // Settings routes
-        $routes->group('settings', function ($routes) {
+        $routes->group('settings', ['filter' => 'permission:settings.view'], function ($routes) {
             $routes->get('/', 'SettingController::index');
             $routes->post('update', 'SettingController::update');
         });
 
         // Court routes
-        $routes->group('courts', function ($routes) {
+        $routes->group('courts', ['filter' => 'permission:courts.view'], function ($routes) {
             $routes->get('/', 'CourtsController::index');
             $routes->get('create', 'CourtsController::create');
             $routes->post('create', 'CourtsController::store');
@@ -221,7 +213,7 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
         });
 
         // Booking routes
-        $routes->group('bookings', function ($routes) {
+        $routes->group('bookings', ['filter' => 'permission:bookings.view'], function ($routes) {
             $routes->get('/', 'BookingsController::index');
             $routes->get('calendar', 'BookingsController::calendar');
             $routes->get('create', 'BookingsController::create');
@@ -235,7 +227,7 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
         });
 
         // Score input & live tournament scoring
-        $routes->group('scores', function ($routes) {
+        $routes->group('scores', ['filter' => 'permission:scores.view'], function ($routes) {
             $routes->get('/', 'Scores::index');
             $routes->get('(:num)', 'Scores::edit/$1');
             $routes->post('(:num)/start', 'Scores::start/$1');
@@ -243,8 +235,8 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
             $routes->post('(:num)/finish', 'Scores::finish/$1');
         });
 
-        // Tournament setup routes
-        $routes->group('tournaments', function ($routes) {
+        // Tournament setup routes (yêu cầu gói có tính năng giải đấu)
+        $routes->group('tournaments', ['filter' => ['permission:tournaments.view', 'plan:tournament']], function ($routes) {
             $routes->get('/', 'Tournaments::index');
             $routes->get('create', 'Tournaments::create');
             $routes->post('store', 'Tournaments::store');
@@ -260,7 +252,7 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
         });
 
         // Dynamic pricing routes
-        $routes->group('pricing-rules', function ($routes) {
+        $routes->group('pricing-rules', ['filter' => 'permission:pricing-rules.view'], function ($routes) {
             $routes->get('/', 'PricingRulesController::index');
             $routes->get('create', 'PricingRulesController::create');
             $routes->post('store', 'PricingRulesController::store');
@@ -272,7 +264,7 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
         });
 
         // Player CRM routes
-        $routes->group('players', function ($routes) {
+        $routes->group('players', ['filter' => 'permission:players.view'], function ($routes) {
             $routes->get('dashboard', 'PlayersController::dashboard');
             $routes->get('ranking', 'PlayersController::ranking');
             $routes->get('/', 'PlayersController::index');
@@ -292,7 +284,7 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
         });
 
         // Club, team and social match routes
-        $routes->group('clubs', function ($routes) {
+        $routes->group('clubs', ['filter' => 'permission:clubs.view'], function ($routes) {
             $routes->get('/', 'ClubsController::index');
             $routes->get('create', 'ClubsController::create');
             $routes->post('store', 'ClubsController::store');
@@ -301,13 +293,13 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
             $routes->get('delete/(:num)', 'ClubsController::delete/$1');
         });
 
-        $routes->group('teams', function ($routes) {
+        $routes->group('teams', ['filter' => 'permission:teams.view'], function ($routes) {
             $routes->get('/', 'TeamsController::index');
             $routes->get('show/(:num)', 'TeamsController::show/$1');
             $routes->post('status/(:num)', 'TeamsController::status/$1');
         });
 
-        $routes->group('matches', function ($routes) {
+        $routes->group('matches', ['filter' => 'permission:matches.view'], function ($routes) {
             $routes->get('/', 'MatchRequestsController::index');
             $routes->get('show/(:num)', 'MatchRequestsController::show/$1');
             $routes->post('approve/(:num)', 'MatchRequestsController::approve/$1');
@@ -316,7 +308,7 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
         });
 
         // Membership routes
-        $routes->group('memberships', function ($routes) {
+        $routes->group('memberships', ['filter' => 'permission:memberships.view'], function ($routes) {
             $routes->get('/', 'MembershipsController::index');
             $routes->get('create', 'MembershipsController::create');
             $routes->post('store', 'MembershipsController::store');
@@ -330,7 +322,7 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
         });
 
         // Tournament scheduling routes
-        $routes->group('tournaments/scheduler', function ($routes) {
+        $routes->group('tournaments/scheduler', ['filter' => 'permission:tournaments.manage'], function ($routes) {
             $routes->get('/', 'TournamentSchedulerController::index');
             $routes->post('auto-schedule', 'TournamentSchedulerController::autoSchedule');
             $routes->post('rerun-unlocked', 'TournamentSchedulerController::rerunUnlocked');
@@ -339,8 +331,8 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
             $routes->post('team-group', 'TournamentSchedulerController::moveTeam');
         });
 
-        // POS routes (quầy bán hàng)
-        $routes->group('pos', function ($routes) {
+        // POS routes (quầy bán hàng — yêu cầu quyền POS + gói có tính năng POS)
+        $routes->group('pos', ['filter' => ['permission:pos.access', 'plan:pos']], function ($routes) {
             $routes->get('/', 'PosController::index');
             $routes->get('counter', 'PosController::index');
             $routes->get('getOrder/(:num)', 'PosController::getOrder/$1');
@@ -357,7 +349,7 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
         });
 
         // Payment routes (hóa đơn & thanh toán)
-        $routes->group('payments', function ($routes) {
+        $routes->group('payments', ['filter' => 'permission:payments.view'], function ($routes) {
             $routes->get('/', 'PaymentController::index');
             $routes->get('detail/(:num)', 'PaymentController::detail/$1');
             $routes->post('create-booking-invoice/(:num)', 'PaymentController::createBookingInvoice/$1');
@@ -371,8 +363,14 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
         });
 
         // Audit logs routes
-        $routes->group('audit-logs', function ($routes) {
+        $routes->group('audit-logs', ['filter' => 'permission:audit-logs.view'], function ($routes) {
             $routes->get('/', 'AuditLogController::index');
+        });
+
+        // SaaS plan routes (gói dịch vụ của tenant)
+        $routes->group('plans', ['filter' => 'permission:plans.view'], function ($routes) {
+            $routes->get('/', 'PlansController::index');
+            $routes->post('subscribe/(:num)', 'PlansController::subscribe/$1');
         });
 
         // Profile routes

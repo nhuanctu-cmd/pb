@@ -32,6 +32,8 @@ return [
     'roleOwner'        => 'Chủ sân',
     'roleManager'      => 'Quản lý chi nhánh',
     'roleStaff'        => 'Nhân viên',
+    'roleReferee'      => 'Trọng tài',
+    'rolePlayer'       => 'Ngườị chơi',
 
     // Chống brute-force
     'loginLocked'        => 'Bạn đã đăng nhập sai quá nhiều lần. Vui lòng thử lại sau {0} phút.',

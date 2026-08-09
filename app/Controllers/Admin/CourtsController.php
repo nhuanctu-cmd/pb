@@ -56,6 +56,14 @@ class CourtsController extends BaseController
     public function store()
     {
         $tenantId = session('tenant_id');
+
+        // SaaS: kiểm tra hạn mức sân theo gói
+        $limit = (new \App\Services\TenantPlanService())->checkLimit((int) $tenantId, 'courts');
+        if (! $limit['allowed']) {
+            return redirect()->back()->withInput()
+                ->with('error', lang('App.planLimitReached', [lang('App.plans_limit_courts'), $limit['max']]));
+        }
+
         $branchId = (int) $this->request->getPost('branch_id');
 
         $rules = [

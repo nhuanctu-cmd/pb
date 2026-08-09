@@ -59,6 +59,13 @@ class PlayersController extends BaseController
     {
         $tenantId = current_tenant_id();
 
+        // SaaS: kiểm tra hạn mức ngườị chơi theo gói
+        $limit = (new \App\Services\TenantPlanService())->checkLimit((int) $tenantId, 'players');
+        if (! $limit['allowed']) {
+            return redirect()->back()->withInput()
+                ->with('error', lang('App.planLimitReached', [lang('App.plans_limit_players'), $limit['max']]));
+        }
+
         $rules = [
             'full_name' => 'required|max_length[255]',
             'phone'     => 'permit_empty|max_length[20]',

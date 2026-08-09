@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="<?= session('locale') ?? 'en' ?>">
+<html lang="<?= session('locale') ?? 'vi' ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -38,6 +38,32 @@
             position: absolute;
             top: 1rem;
             right: 1rem;
+        }
+        .demo-accounts {
+            font-size: 0.85rem;
+        }
+        .demo-account-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.45rem 0.75rem;
+            border: 1px solid #e9ecef;
+            border-radius: 0.5rem;
+            margin-bottom: 0.4rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            background: #fff;
+        }
+        .demo-account-item:hover {
+            border-color: #667eea;
+            background: #f4f6ff;
+        }
+        .demo-account-item .fw-semibold {
+            font-size: 0.82rem;
+        }
+        .demo-account-item code {
+            font-size: 0.78rem;
+            color: #667eea;
         }
     </style>
 </head>
@@ -92,6 +118,30 @@
                                 </div>
                                 <button type="submit" class="btn btn-login w-100 btn-lg"><?= lang('Auth.login') ?></button>
                             </form>
+
+                            <?php if (ENVIRONMENT !== 'production'): ?>
+                            <div class="demo-accounts mt-4 pt-3 border-top">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold text-secondary"><i class="bi bi-person-badge"></i> <?= lang('Auth.demoAccounts') ?></span>
+                                    <span class="text-muted" style="font-size:0.75rem"><?= lang('Auth.demoAccountsNote') ?></span>
+                                </div>
+                                <?php
+                                $demoAccounts = [
+                                    ['role' => lang('Auth.roleSuperAdmin'), 'email' => 'admin@pickleball.com',        'password' => 'admin123'],
+                                    ['role' => lang('Auth.roleOwner'),      'email' => 'owner@pickleballpro.com',     'password' => 'password'],
+                                    ['role' => lang('Auth.roleManager'),    'email' => 'manager@pickleballpro.com',   'password' => 'password'],
+                                    ['role' => lang('Auth.roleStaff'),      'email' => 'staff@pickleballpro.com',     'password' => 'password'],
+                                ];
+                                ?>
+                                <?php foreach ($demoAccounts as $acc): ?>
+                                    <div class="demo-account-item" role="button" tabindex="0"
+                                         data-email="<?= esc($acc['email']) ?>" data-password="<?= esc($acc['password']) ?>">
+                                        <span class="fw-semibold"><?= esc($acc['role']) ?></span>
+                                        <code><?= esc($acc['email']) ?></code>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -99,5 +149,14 @@
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.querySelectorAll('.demo-account-item').forEach(function (item) {
+            item.addEventListener('click', function () {
+                document.querySelector('input[name="email"]').value = this.dataset.email;
+                document.querySelector('input[name="password"]').value = this.dataset.password;
+                document.querySelector('input[name="password"]').focus();
+            });
+        });
+    </script>
 </body>
 </html>

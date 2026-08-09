@@ -24,4 +24,12 @@ return [
     'oldPassword'      => 'Current Password',
     'newPassword'      => 'New Password',
     'confirmPassword'  => 'Confirm Password',
+
+    // Demo accounts (dev environment only)
+    'demoAccounts'     => 'Demo accounts',
+    'demoAccountsNote' => 'Click an account to autofill',
+    'roleSuperAdmin'   => 'Super Admin',
+    'roleOwner'        => 'Court Owner',
+    'roleManager'      => 'Branch Manager',
+    'roleStaff'        => 'Staff',
 ];

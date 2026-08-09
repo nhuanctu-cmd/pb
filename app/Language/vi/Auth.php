@@ -24,4 +24,12 @@ return [
     'oldPassword'      => 'Mật khẩu hiện tại',
     'newPassword'      => 'Mật khẩu mới',
     'confirmPassword'  => 'Xác nhận mật khẩu',
+
+    // Tài khoản demo (chỉ hiển thị môi trường dev)
+    'demoAccounts'     => 'Tài khoản dùng thử',
+    'demoAccountsNote' => 'Nhấn vào tài khoản để điền tự động',
+    'roleSuperAdmin'   => 'Quản trị hệ thống',
+    'roleOwner'        => 'Chủ sân',
+    'roleManager'      => 'Quản lý chi nhánh',
+    'roleStaff'        => 'Nhân viên',
 ];

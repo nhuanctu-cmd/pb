@@ -318,6 +318,122 @@ class BookingService
     }
 
     /**
+     * Move an existing booking into hold queue.
+     */
+    public function holdBookingById(int $bookingId, int $timeoutMinutes = 5, ?int $userId = null, ?int $tenantId = null): array
+    {
+        $db = \Config\Database::connect();
+        $db->transStart();
+        $booking = $this->findBookingForContext($bookingId, $tenantId, true);
+        if (! $booking) {
+            $db->transRollback();
+            return ['success' => false, 'message' => lang('App.booking_not_found')];
+        }
+
+        $allowed = ['reserved', 'paid'];
+        if (! in_array((string) $booking->status, $allowed, true)) {
+            $db->transRollback();
+            return ['success' => false, 'message' => lang('App.invalid_data')];
+        }
+
+        try {
+            $this->stateMachine->assertTransition((string) $booking->status, 'hold');
+        } catch (\InvalidArgumentException) {
+            $db->transRollback();
+            return ['success' => false, 'message' => lang('App.invalid_data')];
+        }
+
+        $timeoutMinutes = max(1, (int) $timeoutMinutes);
+        $now = date('Y-m-d H:i:s');
+        $holdUntil = date('Y-m-d H:i:s', time() + ($timeoutMinutes * 60));
+
+        $this->bookingModel->update($bookingId, [
+            'status' => 'hold',
+            'is_hold' => 1,
+            'timeout_minutes' => $timeoutMinutes,
+            'hold_until' => $holdUntil,
+            'auto_release_at' => $holdUntil,
+            'updated_by' => $userId,
+            'updated_at' => $now,
+        ]);
+        $this->bookingLogModel->addLog(
+            $booking->tenant_id,
+            $bookingId,
+            'hold',
+            (string) $booking->status,
+            'hold',
+            sprintf('Đưa vào hold %d phút.', $timeoutMinutes),
+            $userId
+        );
+
+        $db->transComplete();
+        if ($db->transStatus() === false) {
+            return ['success' => false, 'message' => lang('App.invalid_data')];
+        }
+
+        return [
+            'success' => true,
+            'message' => 'Đã đặt vào hàng chờ HOLD.',
+            'booking' => $this->findBookingForContext($bookingId, $tenantId),
+        ];
+    }
+
+    /**
+     * Release hold and bring booking back to reserved/pending pool.
+     */
+    public function releaseHoldById(int $bookingId, ?int $userId = null, ?int $tenantId = null): array
+    {
+        $db = \Config\Database::connect();
+        $db->transStart();
+        $booking = $this->findBookingForContext($bookingId, $tenantId, true);
+        if (! $booking) {
+            $db->transRollback();
+            return ['success' => false, 'message' => lang('App.booking_not_found')];
+        }
+
+        if ((string) $booking->status !== 'hold') {
+            $db->transRollback();
+            return ['success' => false, 'message' => 'Booking không ở trạng thái HOLD.'];
+        }
+
+        try {
+            $this->stateMachine->assertTransition('hold', 'reserved');
+        } catch (\InvalidArgumentException) {
+            $db->transRollback();
+            return ['success' => false, 'message' => lang('App.invalid_data')];
+        }
+
+        $this->bookingModel->update($bookingId, [
+            'status' => 'reserved',
+            'is_hold' => 0,
+            'auto_release_at' => null,
+            'hold_until' => null,
+            'updated_by' => $userId,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+        $this->bookingLogModel->addLog(
+            $booking->tenant_id,
+            $bookingId,
+            'release_hold',
+            'hold',
+            'reserved',
+            'Mở HOLD, đưa về hàng chờ xác nhận.',
+            $userId
+        );
+
+        $db->transComplete();
+        if ($db->transStatus() === false) {
+            return ['success' => false, 'message' => lang('App.invalid_data')];
+        }
+
+        return [
+            'success' => true,
+            'message' => 'Đã mở HOLD, booking quay về hàng chờ.',
+            'booking' => $this->findBookingForContext($bookingId, $tenantId),
+        ];
+    }
+
+    /**
      * Confirm payment for a booking
      */
     public function confirmPayment(int $bookingId, float $amount, ?int $userId = null, ?int $tenantId = null): array
@@ -438,6 +554,56 @@ class BookingService
         return [
             'success' => true,
             'message' => lang('App.booking_cancelled_success'),
+            'booking' => $this->findBookingForContext($bookingId, $tenantId),
+        ];
+    }
+
+    public function markNoShow(int $bookingId, ?int $userId = null, ?int $tenantId = null, ?string $reason = null): array
+    {
+        $db = \Config\Database::connect();
+        $db->transStart();
+        $booking = $this->findBookingForContext($bookingId, $tenantId, true);
+        if (! $booking) {
+            $db->transRollback();
+            return ['success' => false, 'message' => lang('App.booking_not_found')];
+        }
+
+        try {
+            $this->stateMachine->assertTransition($booking->status, 'no_show');
+        } catch (\InvalidArgumentException) {
+            $db->transRollback();
+            return ['success' => false, 'message' => lang('App.cannot_set_no_show_booking')];
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $this->bookingModel->update($bookingId, [
+            'status' => 'no_show',
+            'cancelled_reason' => $reason ?: null,
+            'updated_by' => $userId,
+            'updated_at' => $now,
+        ]);
+        $this->bookingItemModel->where('booking_id', $bookingId)
+            ->where('status', 'active')
+            ->set(['status' => 'cancelled', 'updated_at' => $now])
+            ->update();
+        $this->bookingLogModel->addLog(
+            $booking->tenant_id,
+            $bookingId,
+            'no_show',
+            $booking->status,
+            'no_show',
+            $reason ?: lang('App.no_show_set'),
+            $userId
+        );
+
+        $db->transComplete();
+        if ($db->transStatus() === false) {
+            return ['success' => false, 'message' => lang('App.cannot_set_no_show_booking')];
+        }
+
+        return [
+            'success' => true,
+            'message' => lang('App.no_show_set'),
             'booking' => $this->findBookingForContext($bookingId, $tenantId),
         ];
     }

@@ -15,6 +15,7 @@ class TenantSubscriptionModel extends Model
     protected $allowedFields    = [
         'tenant_id', 'plan_id', 'status', 'starts_at', 'ends_at',
         'trial_ends_at', 'cancelled_at',
+        'plan_snapshot', 'pricing_term', 'currency_snapshot', 'price_snapshot_amount',
     ];
 
     protected $useTimestamps = true;

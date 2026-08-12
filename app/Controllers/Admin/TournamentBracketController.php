@@ -40,7 +40,7 @@ class TournamentBracketController extends BaseController
             $categoryId = (int) $category->id;
             $brackets[$categoryId] = $this->scheduler->getVisualBracket($categoryId, $tenantId);
             $athletes[$categoryId] = $db->table('tournament_registrations r')
-                ->select('r.*, p.full_name as player_name, p.player_code, p.rating_score, pp.full_name as partner_name, pp.player_code as partner_code')
+                ->select('r.*, r.player_id AS player_id, r.partner_player_id AS partner_player_id, p.full_name as player_name, p.player_code, p.rating_score, pp.full_name as partner_name, pp.player_code as partner_code')
                 ->join('players p', 'p.id = r.player_id AND p.tenant_id = r.tenant_id', 'left')
                 ->join('players pp', 'pp.id = r.partner_player_id AND pp.tenant_id = r.tenant_id', 'left')
                 ->where('r.tenant_id', $tenantId)->where('r.tournament_id', $tournamentId)

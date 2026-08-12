@@ -12,6 +12,7 @@ class TournamentMatchModel extends Model
     protected $protectFields = true;
     protected $allowedFields = [
         'tenant_id', 'tournament_id', 'category_id', 'group_id', 'round_name', 'match_no',
+        'draw_version_id',
         'court_id', 'scheduled_date', 'start_time', 'end_time', 'team_a_id', 'team_b_id',
         'winner_team_id', 'unified_match_id', 'status', 'is_locked',
     ];

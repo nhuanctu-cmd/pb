@@ -7,6 +7,8 @@ use App\Models\TournamentGroupModel;
 use App\Models\TournamentGroupTeamModel;
 use App\Models\TournamentMatchModel;
 use App\Models\TournamentScheduleLockModel;
+use App\Models\DrawPolicyVersionModel;
+use App\Models\TournamentDrawVersionModel;
 use CodeIgniter\Database\BaseConnection;
 use Config\Database;
 
@@ -18,6 +20,10 @@ class TournamentSchedulerService
     private TournamentMatchModel $matchModel;
     private TournamentBracketModel $bracketModel;
     private TournamentScheduleLockModel $lockModel;
+    private DrawPolicyVersionModel $drawPolicyVersionModel;
+    private TournamentDrawVersionModel $drawVersionModel;
+    private bool $hasDrawVersionTable = false;
+    private bool $hasDrawVersionColumn = false;
 
     private int $matchMinutes = 60;
     private int $restMinutes = 30;
@@ -32,6 +38,10 @@ class TournamentSchedulerService
         $this->matchModel = new TournamentMatchModel();
         $this->bracketModel = new TournamentBracketModel();
         $this->lockModel = new TournamentScheduleLockModel();
+        $this->drawPolicyVersionModel = new DrawPolicyVersionModel();
+        $this->drawVersionModel = new TournamentDrawVersionModel();
+        $this->hasDrawVersionTable = $this->db->tableExists('tournament_draw_versions');
+        $this->hasDrawVersionColumn = $this->db->fieldExists('draw_version_id', 'tournament_matches');
     }
 
     public function generateGroups($categoryId, $numberOfGroups): array
@@ -153,18 +163,66 @@ class TournamentSchedulerService
 
     public function generateKnockoutBracket($categoryId): array
     {
+        return $this->generateKnockoutBracketWithOptions((int) $categoryId, []);
+    }
+
+    public function generateKnockoutBracketWithOptions(int $categoryId, array $options = []): array
+    {
         $categoryId = (int) $categoryId;
         $context = $this->getCategoryContext($categoryId);
+        $forceReplace = (bool) ($options['force'] ?? false);
+        $actorId = (int) ($options['actor_id'] ?? 0);
+        $reason = trim((string) ($options['reason'] ?? 'Rebuild draw'));
+        $seedIndex = (int) ($options['seed_index'] ?? 0);
+
         $teams = $this->getRegisteredTeams($categoryId);
         if (count($teams) < 2) {
             return [];
         }
 
-        usort($teams, static fn (array $a, array $b): int => ($a['seed_no'] ?? PHP_INT_MAX) <=> ($b['seed_no'] ?? PHP_INT_MAX));
-        $slots = $this->seededBracketSlots(array_column($teams, 'team_id'));
+        if (! $this->hasDrawVersionTable || ! $this->hasDrawVersionColumn) {
+            return $this->buildKnockoutDrawFromScratch($categoryId, [], $context, [], null);
+        }
 
+        if (! $forceReplace && $this->isCategoryPublishLocked($categoryId)) {
+            throw new \RuntimeException('Hạng mục đã khóa lịch thi đấu, không cho phép tái tạo draw mặc định.');
+        }
+
+        $policyVersion = $this->activeDrawPolicyVersion((int) $context['tenant_id'], (int) $context['tournament_id']);
+        $drawSeed = $this->buildDrawSeed((int) $context['tenant_id'], (int) $context['tournament_id'], $categoryId, $policyVersion, $teams, $seedIndex);
+        $orderedTeams = $this->deterministicTeamOrder($teams, $drawSeed);
+        $drawPayload = $this->buildDrawPayload((int) $context['tenant_id'], (int) $context['tournament_id'], $categoryId, $drawSeed, $policyVersion, $orderedTeams);
+        $signature = $this->drawSignature($drawPayload);
+
+        $drawVersion = $this->latestMatchingDrawVersion((int) $context['tenant_id'], (int) $context['tournament_id'], $categoryId, $signature);
+        if ($drawVersion && ! $forceReplace) {
+            return $this->matchModel->where('draw_version_id', (int) $drawVersion->id)->orderBy('match_no', 'ASC')->findAll();
+        }
+
+        if ($drawVersion && $forceReplace) {
+            $this->drawVersionModel->update($drawVersion->id, ['status' => 'replaced', 'updated_at' => date('Y-m-d H:i:s')]);
+        }
+
+        $drawVersionId = $this->createDrawVersion((int) $context['tenant_id'], (int) $context['tournament_id'], $categoryId, $signature, $drawPayload, $actorId, $reason);
+        if (! $drawVersionId) {
+            return $this->buildKnockoutDrawFromScratch($categoryId, $orderedTeams, $context, $drawPayload, null);
+        }
+
+        return $this->buildKnockoutDrawFromScratch($categoryId, $orderedTeams, $context, $drawPayload, (int) $drawVersionId);
+    }
+
+    private function buildKnockoutDrawFromScratch(int $categoryId, array $orderedTeams, array $context, array $drawPayload, ?int $drawVersionId): array
+    {
+        $this->db->transStart();
         $this->matchModel->where('category_id', $categoryId)->where('group_id', null)->where('is_locked', 0)->delete();
         $this->bracketModel->where('category_id', $categoryId)->delete();
+
+        $teams = $orderedTeams;
+        if (! $teams) {
+            $teams = $this->getRegisteredTeams($categoryId);
+            usort($teams, static fn (array $a, array $b): int => ($a['seed_no'] ?? PHP_INT_MAX) <=> ($b['seed_no'] ?? PHP_INT_MAX));
+        }
+        $slots = $this->seededBracketSlots(array_column($teams, 'team_id'));
 
         $roundMatches = [];
         $matchNo = $this->nextMatchNo($categoryId);
@@ -173,7 +231,7 @@ class TournamentSchedulerService
         foreach ($pairs as $position => $pair) {
             [$teamA, $teamB] = [$pair[0] ?? null, $pair[1] ?? null];
             $winner = $teamA && ! $teamB ? $teamA : ($teamB && ! $teamA ? $teamB : null);
-            $roundMatches[] = $this->createBracketMatch($context, $categoryId, $roundNo, $position + 1, $matchNo++, $teamA, $teamB, $winner);
+            $roundMatches[] = $this->createBracketMatch($context, $categoryId, $roundNo, $position + 1, $matchNo++, $teamA, $teamB, $winner, $drawVersionId);
         }
 
         $allRounds = [$roundMatches];
@@ -182,7 +240,7 @@ class TournamentSchedulerService
             $roundMatches = [];
             $roundNo++;
             for ($i = 0; $i < count($previousRound); $i += 2) {
-                $roundMatches[] = $this->createBracketMatch($context, $categoryId, $roundNo, (int) floor($i / 2) + 1, $matchNo++);
+                $roundMatches[] = $this->createBracketMatch($context, $categoryId, $roundNo, (int) floor($i / 2) + 1, $matchNo++, null, null, null, $drawVersionId);
             }
             foreach ($previousRound as $index => $child) {
                 $next = $roundMatches[(int) floor($index / 2)] ?? null;
@@ -193,8 +251,26 @@ class TournamentSchedulerService
             }
             $allRounds[] = $roundMatches;
         }
+        $drawMatches = array_merge(...$allRounds);
 
-        return array_merge(...$allRounds);
+        if ($drawVersionId) {
+            $this->drawVersionModel->update($drawVersionId, [
+                'status' => 'active',
+                'participant_count' => count($teams),
+                'draw_signature' => $drawPayload['signature'] ?? null,
+                'draw_seed' => $drawPayload['draw_seed'] ?? null,
+                'participant_snapshot' => ! empty($drawPayload['participant_snapshot']) ? json_encode($drawPayload['participant_snapshot']) : null,
+                'draw_config' => ! empty($drawPayload['draw_config']) ? json_encode($drawPayload['draw_config']) : null,
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+        }
+
+        $this->db->transComplete();
+        if (! $this->db->transStatus()) {
+            return [];
+        }
+
+        return $drawMatches;
     }
 
     public function assignCourts($categoryId): array
@@ -649,6 +725,235 @@ class TournamentSchedulerService
         return $slots;
     }
 
+    private function isCategoryPublishLocked(int $categoryId): bool
+    {
+        if (! $this->db->tableExists('tournament_categories') || ! $this->db->tableExists('tournament_schedule_locks')) {
+            return false;
+        }
+
+        $category = $this->db->table('tournament_categories')->where('id', $categoryId)->get(1)->getRow();
+        if (! $category) {
+            return false;
+        }
+
+        return (bool) $this->db->table('tournament_schedule_locks')
+            ->where('tenant_id', (int) $category->tenant_id)
+            ->where('tournament_id', (int) $category->tournament_id)
+            ->where('lock_type', 'time')
+            ->where('ref_id', $categoryId)
+            ->get(1)
+            ->getRow();
+    }
+
+    private function activeDrawPolicyVersion(int $tenantId, int $tournamentId): array
+    {
+        $now = date('Y-m-d H:i:s');
+        $policy = null;
+
+        if ($tournamentId && $this->db->tableExists('tournaments') && $this->db->fieldExists('draw_policy_version_id', 'tournaments')) {
+            $tournament = $this->db->table('tournaments')
+                ->select('draw_policy_version_id, tenant_id')
+                ->where('id', $tournamentId)
+                ->where('tenant_id', $tenantId)
+                ->get(1)
+                ->getRow();
+            if ($tournament && ! empty($tournament->draw_policy_version_id) && $this->db->tableExists('draw_policy_versions')) {
+                $policy = $this->db->table('draw_policy_versions')
+                    ->where('id', (int) $tournament->draw_policy_version_id)
+                    ->where('status', 'active')
+                    ->get(1)
+                    ->getRow();
+            }
+        }
+
+        if (! $policy && $this->db->tableExists('draw_policy_versions')) {
+            $policy = $this->db->table('draw_policy_versions')
+                ->where('status', 'active')
+                ->where('effective_from <=', $now)
+                ->groupStart()
+                    ->where('effective_to', null)
+                    ->orWhere('effective_to >=', $now)
+                ->groupEnd()
+                ->orderBy('effective_from', 'DESC')
+                ->orderBy('id', 'DESC')
+                ->get(1)
+                ->getRow();
+        }
+
+        if (! $policy) {
+            return [];
+        }
+
+        $raw = is_string($policy->policy ?? null) ? json_decode((string) $policy->policy, true) : ((array) ($policy->policy ?? []));
+        return [
+            'id' => (int) $policy->id,
+            'code' => (string) ($policy->code ?? ''),
+            'version' => (string) ($policy->version ?? ''),
+            'content_hash' => (string) ($policy->content_hash ?? ''),
+            'policy' => is_array($raw) ? $raw : [],
+        ];
+    }
+
+    private function buildDrawSeed(int $tenantId, int $tournamentId, int $categoryId, array $policyVersion, array $teams, int $seedIndex): array
+    {
+        $snapshot = [];
+        foreach ($teams as $team) {
+            $snapshot[] = [
+                'team_id' => (int) $team['team_id'],
+                'seed_no' => $team['seed_no'],
+                'club_id' => $team['club_id'] ?? null,
+                'rating' => isset($team['rating']) ? (float) $team['rating'] : 0,
+            ];
+        }
+
+        $payload = [
+            'tenant_id' => $tenantId,
+            'tournament_id' => $tournamentId,
+            'category_id' => $categoryId,
+            'policy_version_id' => $policyVersion['id'] ?? null,
+            'policy_content_hash' => $policyVersion['content_hash'] ?? null,
+            'seed_index' => $seedIndex,
+            'participants' => array_column($snapshot, 'team_id'),
+            'seed_algorithm' => 'seeded_knockout_v1',
+        ];
+        $seed = hash('sha256', json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
+        return [
+            'seed' => $seed,
+            'snapshot' => $snapshot,
+            'payload' => $payload,
+        ];
+    }
+
+    private function deterministicTeamOrder(array $teams, array $drawSeed): array
+    {
+        if (! $teams) return [];
+
+        $seed = (string) ($drawSeed['seed'] ?? '');
+        usort($teams, function (array $left, array $right) use ($seed): int {
+            $leftSeed = (int) ($left['seed_no'] ?? PHP_INT_MAX);
+            $rightSeed = (int) ($right['seed_no'] ?? PHP_INT_MAX);
+            if ($leftSeed !== $rightSeed) {
+                return $leftSeed <=> $rightSeed;
+            }
+
+            $leftRating = (float) ($left['rating'] ?? 0);
+            $rightRating = (float) ($right['rating'] ?? 0);
+            if ($leftRating !== $rightRating) {
+                return $rightRating <=> $leftRating;
+            }
+
+            $leftTie = hexdec(substr(hash('sha256', $seed . '|team|' . (int) $left['team_id']), 0, 12));
+            $rightTie = hexdec(substr(hash('sha256', $seed . '|team|' . (int) $right['team_id']), 0, 12));
+            if ($leftTie === $rightTie) {
+                return (int) $left['team_id'] <=> (int) $right['team_id'];
+            }
+
+            return $leftTie <=> $rightTie;
+        });
+
+        return $teams;
+    }
+
+    private function buildDrawPayload(int $tenantId, int $tournamentId, int $categoryId, array $drawSeed, array $policyVersion, array $orderedTeams): array
+    {
+        $participantSnapshot = [];
+        foreach ($orderedTeams as $team) {
+            $participantSnapshot[] = [
+                'team_id' => (int) $team['team_id'],
+                'seed_no' => $team['seed_no'],
+                'club_id' => $team['club_id'] ?? null,
+                'rating' => isset($team['rating']) ? (float) $team['rating'] : 0,
+            ];
+        }
+
+        return [
+            'algorithm' => 'single_elimination_knockout_v1',
+            'tenant_id' => $tenantId,
+            'tournament_id' => $tournamentId,
+            'category_id' => $categoryId,
+            'draw_seed' => (string) ($drawSeed['seed'] ?? ''),
+            'seed_index' => (int) ($drawSeed['payload']['seed_index'] ?? 0),
+            'participant_count' => count($participantSnapshot),
+            'participant_snapshot' => $participantSnapshot,
+            'draw_config' => [
+                'seed_input' => $drawSeed['snapshot'] ?? [],
+                'match_minutes' => $this->matchMinutes,
+                'rest_minutes' => $this->restMinutes,
+                'day_start' => $this->dayStart,
+                'day_end' => $this->dayEnd,
+            ],
+            'policy' => [
+                'version_id' => $policyVersion['id'] ?? null,
+                'policy_code' => $policyVersion['code'] ?? null,
+                'version' => $policyVersion['version'] ?? null,
+                'content_hash' => $policyVersion['content_hash'] ?? null,
+                'policy' => is_array($policyVersion['policy'] ?? null) ? $policyVersion['policy'] : [],
+            ],
+        ];
+    }
+
+    private function drawSignature(array $drawPayload): string
+    {
+        return hash('sha256', json_encode($drawPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    private function latestMatchingDrawVersion(int $tenantId, int $tournamentId, int $categoryId, string $signature): ?object
+    {
+        if (! $this->hasDrawVersionTable) {
+            return null;
+        }
+
+        return $this->db->table('tournament_draw_versions')
+            ->where('tenant_id', $tenantId)
+            ->where('tournament_id', $tournamentId)
+            ->where('category_id', $categoryId)
+            ->where('draw_signature', $signature)
+            ->whereIn('status', ['active', 'draft'])
+            ->orderBy('id', 'DESC')
+            ->get(1)
+            ->getRow();
+    }
+
+    private function createDrawVersion(int $tenantId, int $tournamentId, int $categoryId, string $signature, array $drawPayload, int $actorId, string $reason): ?int
+    {
+        if (! $this->hasDrawVersionTable || ! $this->hasDrawVersionColumn) {
+            return null;
+        }
+
+        $policy = $drawPayload['policy'] ?? [];
+        $now = date('Y-m-d H:i:s');
+        $record = [
+            'tenant_id' => $tenantId,
+            'tournament_id' => $tournamentId,
+            'category_id' => $categoryId,
+            'draw_signature' => $signature,
+            'draw_seed' => (string) ($drawPayload['draw_seed'] ?? ''),
+            'participant_count' => (int) ($drawPayload['participant_count'] ?? 0),
+            'participant_snapshot' => ! empty($drawPayload['participant_snapshot']) ? json_encode($drawPayload['participant_snapshot'], JSON_UNESCAPED_UNICODE) : null,
+            'draw_config' => ! empty($drawPayload['draw_config']) ? json_encode($drawPayload['draw_config'], JSON_UNESCAPED_UNICODE) : null,
+            'status' => 'active',
+            'draw_policy_version_id' => ! empty($policy['version_id']) ? (int) $policy['version_id'] : null,
+            'draw_policy_hash' => (string) ($policy['content_hash'] ?? ''),
+            'draw_policy_code' => (string) ($policy['policy_code'] ?? ''),
+            'created_by' => $actorId ?: null,
+            'reason' => $reason ?: null,
+            'metadata' => json_encode([
+                'signature_material' => $drawPayload,
+                'seed_input_count' => count($drawPayload['participant_snapshot'] ?? []),
+            ], JSON_UNESCAPED_UNICODE),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ];
+
+        $id = $this->drawVersionModel->insert($record);
+        if (! $id) {
+            return null;
+        }
+
+        return (int) $id;
+    }
+
     private function seedOrder(int $size): array
     {
         $order = [1];
@@ -665,10 +970,10 @@ class TournamentSchedulerService
         return $order;
     }
 
-    private function createBracketMatch(array $context, int $categoryId, int $roundNo, int $position, int $matchNo, ?int $teamA = null, ?int $teamB = null, ?int $winner = null): object
+    private function createBracketMatch(array $context, int $categoryId, int $roundNo, int $position, int $matchNo, ?int $teamA = null, ?int $teamB = null, ?int $winner = null, ?int $drawVersionId = null): object
     {
         $roundName = $roundNo === 1 ? 'Knockout R1' : 'Knockout R' . $roundNo;
-        $id = $this->matchModel->insert([
+        $row = [
             'tenant_id' => $context['tenant_id'],
             'tournament_id' => $context['tournament_id'],
             'category_id' => $categoryId,
@@ -680,7 +985,11 @@ class TournamentSchedulerService
             'winner_team_id' => $winner,
             'status' => $winner ? 'completed' : 'scheduled',
             'is_locked' => 0,
-        ]);
+        ];
+        if ($drawVersionId) {
+            $row['draw_version_id'] = $drawVersionId;
+        }
+        $id = $this->matchModel->insert($row);
 
         $this->bracketModel->insert([
             'tenant_id' => $context['tenant_id'],

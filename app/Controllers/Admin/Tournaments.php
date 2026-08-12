@@ -11,18 +11,21 @@ use App\Models\TournamentRegistrationModel;
 use App\Models\TournamentRuleModel;
 use App\Models\TournamentSponsorModel;
 use App\Services\TournamentRegistrationService;
+use App\Services\TournamentFinanceService;
 use App\Services\TournamentService;
 
 class Tournaments extends BaseController
 {
     protected TournamentService $tournamentService;
     protected TournamentRegistrationService $registrationService;
+    protected TournamentFinanceService $financeService;
     protected TournamentModel $tournamentModel;
 
     public function __construct()
     {
         $this->tournamentService = new TournamentService();
         $this->registrationService = new TournamentRegistrationService();
+        $this->financeService = new TournamentFinanceService();
         $this->tournamentModel = model(TournamentModel::class);
     }
 
@@ -339,6 +342,7 @@ class Tournaments extends BaseController
     private function detailData(int $id): ?array
     {
         $tenantId = (int) current_tenant_id();
+        $financeSummary = $this->financeService->summary($tenantId, $id);
         $tournament = $this->tournamentModel->findForTenant($id, $tenantId);
         if (! $tournament) {
             return null;
@@ -426,6 +430,7 @@ class Tournaments extends BaseController
             'tournament' => $tournament,
             'categories' => $categories,
             'rule' => model(TournamentRuleModel::class)->where('tournament_id', $id)->first(),
+            'finance' => $financeSummary,
             'sponsors' => model(TournamentSponsorModel::class)->getByTournament($id),
             'registrations' => model(TournamentRegistrationModel::class)->getByTournament($id, $tenantId),
             'categoryStats' => $categoryStats,

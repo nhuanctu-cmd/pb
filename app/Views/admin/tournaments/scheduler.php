@@ -36,6 +36,11 @@
         <?= csrf_field() ?>
         <input type="hidden" name="category_id" value="<?= (int) $categoryId ?>">
         <input type="number" name="groups" class="form-control" value="<?= max(2, count($groups ?: [])) ?>" min="1" style="width: 110px">
+        <input type="number" name="seed_index" class="form-control" value="0" min="0" title="Chỉ số seed phụ để đổi biến thể draw khi cùng dữ liệu" style="max-width: 125px" placeholder="seed_index">
+        <input type="text" name="rebuild_reason" class="form-control" placeholder="Lý do rebuild draw (nếu cần)" style="width: 200px">
+        <label class="d-flex align-items-center gap-1 small text-muted">
+            <input type="checkbox" name="force_rebuild" value="1"> Cho phép rebuild khi đã publish
+        </label>
         <button class="btn btn-primary" type="submit"><i class="bi bi-magic"></i> Auto schedule</button>
     </form>
     <form method="post" action="/admin/tournaments/scheduler/rerun-unlocked">

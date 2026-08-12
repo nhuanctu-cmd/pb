@@ -28,6 +28,11 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link <?= is_active_route('admin/owner-dashboard') ?>" href="/admin/owner-dashboard">
+                    <i class="bi bi-briefcase"></i> Owner Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link <?= is_active_route('admin/facilities') ?>" href="/admin/facilities">
                     <i class="bi bi-buildings"></i> Facilities
                 </a>

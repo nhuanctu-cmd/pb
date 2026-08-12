@@ -33,7 +33,20 @@ class PublicPortalApi extends BaseController
         if ($discipline === 'mixed') $discipline = 'mixed_doubles';
         if (! in_array($discipline, ['singles', 'doubles', 'mixed_doubles'], true)) $discipline = 'singles';
         $rows = service('ratingEngine')->history($tenantId, $playerId, $discipline, (int) ($this->request->getGet('limit') ?: 50));
-        return service('apiResponseService')->success(['player_id' => $playerId, 'discipline' => $discipline, 'items' => array_map(static fn (object $row): array => ['id' => (int) $row->id, 'before_rating' => $row->before_rating !== null ? (float) $row->before_rating : null, 'after_rating' => $row->after_rating !== null ? (float) $row->after_rating : null, 'delta' => (float) $row->rating_delta, 'processed_at' => $row->processed_at, 'reason' => $row->reason], $rows)]);
+        return service('apiResponseService')->success([
+            'player_id' => $playerId,
+            'discipline' => $discipline,
+            'items' => array_map(static fn (object $row): array => [
+                'id' => (int) $row->id,
+                'transaction_type' => (string) $row->transaction_type,
+                'match_id' => $row->match_id ? (int) $row->match_id : null,
+                'before_rating' => $row->before_rating !== null ? (float) $row->before_rating : null,
+                'after_rating' => $row->after_rating !== null ? (float) $row->after_rating : null,
+                'delta' => (float) $row->rating_delta,
+                'processed_at' => $row->processed_at,
+                'reason' => (string) $row->reason,
+            ], $rows),
+        ]);
     }
 
     public function countries()

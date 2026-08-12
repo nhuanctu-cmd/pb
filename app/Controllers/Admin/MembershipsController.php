@@ -76,16 +76,198 @@ class MembershipsController extends BaseController
     public function renewals()
     {
         $days = max(1, min(365, (int) ($this->request->getGet('days') ?: 30)));
+        $status = (string) ($this->request->getGet('status') ?: 'active');
+        $search = trim((string) ($this->request->getGet('q') ?: ''));
+        $packageId = (int) ($this->request->getGet('package_id') ?: 0);
+        $historyMembershipId = (int) ($this->request->getGet('history_membership_id') ?: 0);
         $this->viewData['pageTitle'] = 'Gia hạn hội viên';
         $this->viewData['days'] = $days;
-        $this->viewData['renewals'] = $this->membershipService->getRenewalCandidates((int) current_tenant_id(), $days);
+        $this->viewData['statuses'] = [
+            'active' => 'Đang còn hiệu lực',
+            'expired' => 'Đã hết hạn',
+            '' => 'Tất cả',
+        ];
+        $this->viewData['packages'] = $this->membershipService->getPackages((int) current_tenant_id());
+        $this->viewData['statusFilter'] = $status === 'active' ? 'active' : ($status === 'expired' ? 'expired' : '');
+        $this->viewData['search'] = $search;
+        $this->viewData['packageFilter'] = $packageId > 0 ? $packageId : 0;
+        $this->viewData['renewals'] = $this->membershipService->getRenewalCandidatesFiltered(
+            (int) current_tenant_id(),
+            $days,
+            $packageId > 0 ? $packageId : null,
+            $this->viewData['statusFilter'],
+            $search
+        );
+        $this->viewData['historyMembershipId'] = $historyMembershipId;
+        $this->viewData['reminderTemplates'] = $this->membershipService->reminderTemplateDefaults();
+        $this->viewData['reminderHistory'] = $this->membershipService->getRenewalHistory(
+            (int) current_tenant_id(),
+            $historyMembershipId > 0 ? $historyMembershipId : null,
+            50
+        );
         return $this->render('admin/memberships/renewals', $this->viewData);
+    }
+
+    public function exportRenewals()
+    {
+        $days = max(1, min(365, (int) ($this->request->getGet('days') ?: 30)));
+        $status = (string) ($this->request->getGet('status') ?: 'active');
+        $search = trim((string) ($this->request->getGet('q') ?: ''));
+        $packageId = (int) ($this->request->getGet('package_id') ?: 0);
+        $tenantId = (int) current_tenant_id();
+        $statusFilter = $status === 'active' ? 'active' : ($status === 'expired' ? 'expired' : '');
+
+        $rows = $this->membershipService->getRenewalCandidatesFiltered(
+            $tenantId,
+            $days,
+            $packageId > 0 ? $packageId : null,
+            $statusFilter,
+            $search
+        );
+
+        $lines = [];
+        $lines[] = '"Khach hang","Ma","SDT","Goi","Het han","Con lai","Gia"';
+        foreach ($rows as $row) {
+            $line = [
+                (string) ($row->full_name ?? ''),
+                (string) ($row->player_code ?? ''),
+                (string) ($row->phone ?? ''),
+                (string) ($row->package_name_vi ?? ($row->package_name_en ?? '')),
+                (string) ($row->end_date ?? ''),
+                (string) ($row->remaining_days ?? 0),
+                (string) ($row->price ?? 0),
+            ];
+            $lines[] = implode(',', array_map(fn ($value) => '"' . str_replace('"', '""', (string) $value) . '"', $line));
+        }
+
+        return $this->response->download(
+            'renewals-' . date('Ymd') . '.csv',
+            implode("\r\n", $lines)
+        );
     }
 
     public function renew(int $id)
     {
-        $newId = $this->membershipService->renew($id, (int) current_tenant_id());
+        $packageId = (int) ($this->request->getPost('package_id') ?: 0);
+        $newId = $this->membershipService->renew($id, (int) current_tenant_id(), $packageId > 0 ? $packageId : null, user_id());
         return redirect()->to('/admin/memberships/renewals')->with($newId ? 'success' : 'error', $newId ? 'Đã gia hạn hội viên.' : 'Không thể gia hạn hội viên.');
+    }
+
+    public function sendReminder(int $id)
+    {
+        $tenantId = (int) current_tenant_id();
+        $channel = (string) ($this->request->getPost('channel') ?: 'sms');
+        $testMode = (int) ($this->request->getPost('test_mode') ?: 0) === 1;
+        $recipient = trim((string) ($this->request->getPost('recipient') ?: ''));
+        $messageTemplate = trim((string) ($this->request->getPost('message_template') ?: ''));
+        $keepFilter = $this->normalizeRenewalFilterPayload();
+
+        $result = $this->membershipService->sendReminder(
+            $id,
+            $tenantId,
+            $channel,
+            $testMode,
+            $recipient !== '' ? $recipient : null,
+            user_id(),
+            $messageTemplate !== '' ? $messageTemplate : null
+        );
+
+        $redirect = '/admin/memberships/renewals?' . http_build_query(array_filter($keepFilter, static fn($value) => $value !== ''));
+        return redirect()->to($redirect)->with($result['success'] ? 'success' : 'error', $result['message']);
+    }
+
+    public function bulkReminders()
+    {
+        $tenantId = (int) current_tenant_id();
+        $membershipIds = (array) $this->request->getPost('membership_ids');
+        $channel = (string) ($this->request->getPost('reminder_channel') ?: 'sms');
+        $testMode = (int) ($this->request->getPost('test_mode') ?: 0) === 1;
+        $recipient = trim((string) ($this->request->getPost('recipient') ?: ''));
+        $messageTemplate = trim((string) ($this->request->getPost('message_template') ?: ''));
+
+        if (empty($membershipIds)) {
+            $keepFilter = $this->normalizeRenewalFilterPayload();
+            $redirect = '/admin/memberships/renewals?' . http_build_query(array_filter($keepFilter, static fn($value) => $value !== ''));
+            return redirect()->to($redirect)->with('error', 'Chưa chọn hội viên để gửi nhắc nhở.');
+        }
+
+        $result = $this->membershipService->sendBulkReminders(
+            $membershipIds,
+            $tenantId,
+            $channel,
+            $testMode,
+            $recipient !== '' ? $recipient : null,
+            user_id(),
+            $messageTemplate !== '' ? $messageTemplate : null
+        );
+
+        $keepFilter = $this->normalizeRenewalFilterPayload();
+        $redirect = '/admin/memberships/renewals?' . http_build_query(array_filter($keepFilter, static fn($value) => $value !== ''));
+        if ($result['failed'] === 0) {
+            return redirect()->to($redirect)->with(
+                'success',
+                'Đã gửi nhắc nhở: ' . $result['success'] . '/' . $result['requested'] . ' hồ sơ.'
+            );
+        }
+
+        return redirect()->to($redirect)->with(
+            'error',
+            'Gửi nhắc nhở một phần: ' . $result['success'] . '/' . $result['requested'] . ' thành công.'
+        );
+    }
+
+    protected function normalizeRenewalFilterPayload(): array
+    {
+        return [
+            'days' => max(1, min(365, (int) (
+                $this->request->getPost('filter_days')
+                ?: $this->request->getPost('days')
+                ?: $this->request->getGet('days')
+                ?: 30
+            ))),
+            'status' => (string) (
+                $this->request->getPost('filter_status')
+                ?: $this->request->getPost('status')
+                ?: $this->request->getGet('status')
+                ?: 'active'
+            ),
+            'package_id' => (int) (
+                $this->request->getPost('filter_package_id')
+                ?: $this->request->getPost('package_id')
+                ?: $this->request->getGet('package_id')
+                ?: 0
+            ),
+            'q' => trim((string) (
+                $this->request->getPost('filter_q')
+                ?: $this->request->getPost('q')
+                ?: $this->request->getGet('q')
+                ?: ''
+            )),
+            'history_membership_id' => (int) (
+                $this->request->getPost('filter_history_membership_id')
+                ?: $this->request->getPost('history_membership_id')
+                ?: $this->request->getGet('history_membership_id')
+                ?: 0
+            ),
+        ];
+    }
+
+    public function bulkRenew()
+    {
+        $tenantId = (int) current_tenant_id();
+        $ids = (array) $this->request->getPost('membership_ids');
+        $packageId = (int) ($this->request->getPost('package_id') ?: 0);
+        if (empty($ids)) {
+            return redirect()->back()->with('error', 'Chưa chọn hội viên để gia hạn.');
+        }
+
+        $result = $this->membershipService->bulkRenew($tenantId, $ids, $packageId > 0 ? $packageId : null);
+        if ($result['failed'] > 0) {
+            return redirect()->to('/admin/memberships/renewals')
+                ->with('error', 'Gia hạn một phần: thành công ' . $result['success'] . ' / ' . $result['requested'] . ' hồ sơ.');
+        }
+        return redirect()->to('/admin/memberships/renewals')
+            ->with('success', 'Gia hạn thành công ' . $result['success'] . ' hồ sơ.');
     }
 
     public function packages()

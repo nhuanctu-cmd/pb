@@ -40,6 +40,30 @@ class RatingEngineExtendedTest extends CIUnitTestCase
         $this->assertGreaterThan($old['score'], $fresh['score']);
     }
 
+    public function testReliabilityUsesSeparateOpponentAndPartnerDiversity(): void
+    {
+        $engine = new RatingReliabilityEngine();
+        $baseFacts = [
+            'rated_match_count' => 20,
+            'verified_match_count' => 20,
+            'opponent_count' => 2,
+            'partner_count' => 0,
+            'competition_type_count' => 1,
+            'last_rated_match_at' => '2026-08-09 12:00:00',
+        ];
+        $partnerFacts = $baseFacts;
+        $partnerFacts['partner_count'] = 6;
+
+        $base = $engine->calculate($baseFacts, [], '2026-08-09 12:00:00');
+        $withPartners = $engine->calculate($partnerFacts, [], '2026-08-09 12:00:00');
+
+        $this->assertEquals(0, $base['components']['partner_diversity']);
+        $this->assertEquals(100, $withPartners['components']['partner_diversity']);
+        $this->assertGreaterThan($base['score'], $withPartners['score']);
+        $this->assertEquals(25, $base['components']['opponent_diversity']);
+        $this->assertEquals(25, $withPartners['components']['opponent_diversity']);
+    }
+
     public function testIntegrityFlagsInvalidScoreAsHighRisk(): void
     {
         $result = (new RatingIntegrityService())->evaluate(

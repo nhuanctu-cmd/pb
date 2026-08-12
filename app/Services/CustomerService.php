@@ -98,4 +98,38 @@ class CustomerService
             'created_at' => $now,
         ]);
     }
+
+    public function recordTimeline(
+        int $tenantId,
+        int $customerId,
+        string $eventType,
+        string $title,
+        array $payload = [],
+        ?string $description = null,
+        ?int $actorId = null,
+        ?string $sourceType = 'system',
+        ?int $sourceId = null
+    ): bool {
+        if (! $this->available()) {
+            return true;
+        }
+
+        $customer = $this->customerModel->findForTenant($customerId, $tenantId);
+        if (! $customer) {
+            return false;
+        }
+
+        return (bool) $this->customerModel->db->table('customer_timeline_events')->insert([
+            'tenant_id' => $tenantId,
+            'customer_id' => $customerId,
+            'event_type' => $eventType,
+            'title' => $title,
+            'description' => $description,
+            'source_type' => $sourceType,
+            'source_id' => $sourceId,
+            'actor_id' => $actorId ?? user_id() ?? null,
+            'payload' => $payload ? json_encode($payload, JSON_UNESCAPED_UNICODE) : null,
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+    }
 }

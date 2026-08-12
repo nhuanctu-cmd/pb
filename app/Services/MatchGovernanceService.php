@@ -60,6 +60,9 @@ class MatchGovernanceService
                 service('ratingEngine')->reverseMatch((int) $dispute->match_id, (int) $result->current_version_id, $tenantId);
             }
             $this->matchModel->update($dispute->match_id, ['status' => 'disputed', 'verification_status' => 'pending']);
+            if (! empty($dispute->tenant_id)) {
+                service('ratingRebuildService')->queueFromMatch((int) $dispute->tenant_id, (int) $dispute->match_id, null, 'dispute-upheld', ['dispute_id' => (int) $disputeId]);
+            }
         }
         return ['success' => true, 'dispute' => $this->disputeModel->find($disputeId)];
     }

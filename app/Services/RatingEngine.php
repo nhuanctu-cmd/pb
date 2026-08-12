@@ -124,7 +124,17 @@ class RatingEngine
         $disciplineRow = $this->db->table('rating_disciplines')->where('code', $discipline)->get()->getRow();
         $provider = $this->db->table('rating_providers')->where('code', 'internal-v1')->get()->getRow();
         if (! $disciplineRow || ! $provider) return [];
-        return $this->db->table('rating_transactions')->where('tenant_id', $tenantId)->where('player_id', $playerId)->where('provider_id', $provider->id)->where('discipline_id', $disciplineRow->id)->whereIn('transaction_type', ['impact', 'replacement'])->where('status', 'applied')->orderBy('created_at', 'DESC')->limit(max(1, min(200, $limit)))->get()->getResult();
+        return $this->db->table('rating_transactions')
+            ->where('tenant_id', $tenantId)
+            ->where('player_id', $playerId)
+            ->where('provider_id', $provider->id)
+            ->where('discipline_id', $disciplineRow->id)
+            ->whereIn('transaction_type', ['seed', 'impact', 'replacement', 'adjustment', 'reversal'])
+            ->where('status', 'applied')
+            ->orderBy('created_at', 'DESC')
+            ->limit(max(1, min(300, $limit)))
+            ->get()
+            ->getResult();
     }
 
     public function reverseMatch(int $matchId, int $versionId, ?int $tenantId = null): array

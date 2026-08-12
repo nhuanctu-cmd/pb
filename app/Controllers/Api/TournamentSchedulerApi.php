@@ -29,6 +29,9 @@ class TournamentSchedulerApi extends ResourceController
         $payload = $this->request->getJSON(true) ?: $this->request->getPost();
         $categoryId = (int) ($payload['category_id'] ?? 0);
         $groups = (int) ($payload['groups'] ?? 2);
+        $forceRebuild = (bool) ($payload['force_rebuild'] ?? false);
+        $seedIndex = (int) ($payload['seed_index'] ?? 0);
+        $reason = trim((string) ($payload['rebuild_reason'] ?? ''));
 
         if (! $categoryId) {
             return $this->failValidationErrors(['category_id' => 'category_id is required']);
@@ -44,7 +47,16 @@ class TournamentSchedulerApi extends ResourceController
         foreach ($createdGroups as $group) {
             $this->scheduler->generateRoundRobinMatches((int) $group->id);
         }
-        $this->scheduler->generateKnockoutBracket($categoryId);
+        try {
+            $this->scheduler->generateKnockoutBracketWithOptions($categoryId, [
+                'force' => $forceRebuild,
+                'seed_index' => $seedIndex,
+                'reason' => $reason !== '' ? $reason : 'Rebuild draw from API',
+                'actor_id' => (int) ($this->request->api_user_id ?? user_id() ?? 0),
+            ]);
+        } catch (\RuntimeException $ex) {
+            return $this->fail($ex->getMessage(), 409);
+        }
         $this->scheduler->assignCourts($categoryId);
         $this->scheduler->assignTimeSlots($categoryId);
 

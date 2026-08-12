@@ -40,16 +40,104 @@
     <?php endif; ?>
 
     <section id="tv-slides">
-        <div class="tv-slide active" data-slide="live"><div class="slide-label mb-3">LIVE NOW</div><div class="score-board"><?php foreach (($data['live_matches'] ?? []) as $match): ?><article class="match"><div class="d-flex justify-content-between text-white-50"><span>M<?= (int) $match->match_no ?></span><span><?= esc($match->court_name ?? 'Court') ?></span></div><div class="mt-3 fs-4"><?= esc($match->team_a_label ?? ($match->team_a_name ?? ('Team #' . ($match->team_a_id ?? '-')))) ?></div><div class="score"><?= esc($match->score_text ?? '-') ?></div><div class="fs-4"><?= esc($match->team_b_label ?? ($match->team_b_name ?? ('Team #' . ($match->team_b_id ?? '-')))) ?></div></article><?php endforeach; ?><?php if (empty($data['live_matches'])): ?><div class="text-white-50 fs-3">Chưa có trận đang thi đấu</div><?php endif; ?></div></div>
-        <div class="tv-slide" data-slide="call"><div class="call-match"><div class="slide-label">CALL PLAYER</div><?php $match = ($data['called_matches'] ?? [])[0] ?? null; ?><?php if ($match): ?><h2 class="mt-4">SÂN <?= esc($match->court_name ?? '-') ?></h2><div class="fs-2">M<?= (int) $match->match_no ?> · <?= esc($match->team_a_label ?? '') ?> <span class="text-white-50">VS</span> <?= esc($match->team_b_label ?? '') ?></div><?php else: ?><h2 class="mt-4">Các VĐV chuẩn bị vào sân</h2><?php endif; ?></div></div>
-        <div class="tv-slide" data-slide="next"><div class="slide-label mb-3">NEXT MATCHES</div><div class="score-board"><?php foreach (array_slice($data['next_matches'] ?? [], 0, 6) as $match): ?><article class="match"><div class="d-flex justify-content-between text-white-50"><span>M<?= (int) $match->match_no ?></span><span><?= esc($match->court_name ?? 'Chưa phân sân') ?> · <?= esc(substr((string) ($match->start_time ?? ''), 0, 5)) ?></span></div><div class="mt-3 fs-4"><?= esc($match->team_a_label ?? '') ?></div><div class="text-white-50 my-2">VS</div><div class="fs-4"><?= esc($match->team_b_label ?? '') ?></div></article><?php endforeach; ?></div></div>
-        <div class="tv-slide" data-slide="results"><div class="slide-label mb-3">KẾT QUẢ MỚI NHẤT</div><div class="score-board"><?php foreach (($data['result_matches'] ?? []) as $match): ?><article class="match"><div class="d-flex justify-content-between text-white-50"><span>M<?= (int) $match->match_no ?></span><span><?= esc($match->category_name ?? '') ?></span></div><div class="mt-3 fs-4"><?= esc($match->team_a_label ?? '') ?></div><div class="score"><?= esc($match->score_text ?? '-') ?></div><div class="fs-4"><?= esc($match->team_b_label ?? '') ?></div></article><?php endforeach; ?></div></div>
+        <div class="tv-slide active" data-slide="live">
+            <div class="slide-label mb-3">LIVE NOW</div>
+            <div class="score-board">
+                <?php foreach (($data['live_matches'] ?? []) as $match): ?>
+                    <article class="match">
+                        <div class="d-flex justify-content-between text-white-50">
+                            <span>M<?= (int) $match->match_no ?></span>
+                            <span><?= esc($match->court_name ?? 'Court') ?></span>
+                        </div>
+                        <div class="mt-3 fs-4"><?= esc($match->team_a_label ?? ($match->team_a_name ?? ('Team #' . ($match->team_a_id ?? '-')))) ?></div>
+                        <div class="score"><?= esc($match->score_text ?? '-') ?></div>
+                        <div class="fs-4"><?= esc($match->team_b_label ?? ($match->team_b_name ?? ('Team #' . ($match->team_b_id ?? '-')))) ?></div>
+                    </article>
+                <?php endforeach; ?>
+                <?php if (empty($data['live_matches'])): ?>
+                    <article class="match text-center text-white-50 fs-3">
+                        <p class="mb-0">Chưa có trận đang thi đấu</p>
+                    </article>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <div class="tv-slide" data-slide="call">
+            <div class="call-match">
+                <div class="slide-label">CALL PLAYER</div>
+                <?php $match = ($data['called_matches'] ?? [])[0] ?? null; ?>
+                <?php if ($match): ?>
+                    <h2 class="mt-4">SÂN <?= esc($match->court_name ?? '-') ?></h2>
+                    <div class="fs-2">M<?= (int) $match->match_no ?> · <?= esc($match->team_a_label ?? '') ?> <span class="text-white-50">VS</span> <?= esc($match->team_b_label ?? '') ?></div>
+                <?php else: ?>
+                    <h2 class="mt-4">Các VĐV chuẩn bị vào sân</h2>
+                    <p class="text-white-50 mb-0">Màn hình tự chuyển sang lịch kế tiếp sau một nhịp.</p>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <div class="tv-slide" data-slide="next">
+            <div class="slide-label mb-3">NEXT MATCHES</div>
+            <div class="score-board">
+                <?php foreach (array_slice($data['next_matches'] ?? [], 0, 6) as $match): ?>
+                    <article class="match">
+                        <div class="d-flex justify-content-between text-white-50">
+                            <span>M<?= (int) $match->match_no ?></span>
+                            <span><?= esc($match->court_name ?? 'Chưa phân sân') ?> · <?= esc(substr((string) ($match->start_time ?? ''), 0, 5)) ?></span>
+                        </div>
+                        <div class="mt-3 fs-4"><?= esc($match->team_a_label ?? '') ?></div>
+                        <div class="text-white-50 my-2">VS</div>
+                        <div class="fs-4"><?= esc($match->team_b_label ?? '') ?></div>
+                    </article>
+                <?php endforeach; ?>
+                <?php if (empty($data['next_matches'])): ?>
+                    <article class="match text-center text-white-50 fs-3">
+                        <p class="mb-0">Chưa có trận kế tiếp.</p>
+                    </article>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <div class="tv-slide" data-slide="results">
+            <div class="slide-label mb-3">KẾT QUẢ MỚI NHẤT</div>
+            <div class="score-board">
+                <?php foreach (($data['result_matches'] ?? []) as $match): ?>
+                    <article class="match">
+                        <div class="d-flex justify-content-between text-white-50">
+                            <span>M<?= (int) $match->match_no ?></span>
+                            <span><?= esc($match->category_name ?? '') ?></span>
+                        </div>
+                        <div class="mt-3 fs-4"><?= esc($match->team_a_label ?? '') ?></div>
+                        <div class="score"><?= esc($match->score_text ?? '-') ?></div>
+                        <div class="fs-4"><?= esc($match->team_b_label ?? '') ?></div>
+                    </article>
+                <?php endforeach; ?>
+                <?php if (empty($data['result_matches'])): ?>
+                    <article class="match text-center text-white-50 fs-3">
+                        <p class="mb-0">Chưa có kết quả mới.</p>
+                    </article>
+                <?php endif; ?>
+            </div>
+        </div>
     </section>
 </main>
 <script>
-const slides = [...document.querySelectorAll('.tv-slide')]; const sequence = <?= json_encode($data['slides'] ?? ['live', 'next'], JSON_UNESCAPED_UNICODE) ?>; let slideIndex = 0;
-function showSlide() { const type = sequence[slideIndex % Math.max(1, sequence.length)]; slides.forEach((slide) => slide.classList.toggle('active', slide.dataset.slide === type)); slideIndex++; }
-if (sequence.length > 1) { setInterval(showSlide, 8000); } setTimeout(() => location.reload(), Math.max(15, <?= max(1, (int) ($data['refresh_seconds'] ?? 5)) ?>) * 1000);
+const slides = [...document.querySelectorAll('.tv-slide')];
+const sequence = <?= json_encode($data['slides'] ?? ['live', 'next', 'call', 'results'], JSON_UNESCAPED_UNICODE) ?>;
+const refreshSeconds = Math.max(5, <?= max(1, (int) ($data['refresh_seconds'] ?? 5)) ?>);
+const slideHoldSeconds = Math.max(5, Math.round(refreshSeconds * 1.2));
+let slideIndex = 0;
+
+function showSlide() {
+    const type = sequence[slideIndex % Math.max(1, sequence.length)];
+    slides.forEach((slide) => slide.classList.toggle('active', slide.dataset.slide === type));
+    slideIndex++;
+}
+
+if (sequence.length > 1) {
+    setInterval(showSlide, slideHoldSeconds * 1000);
+}
+setTimeout(() => location.reload(), refreshSeconds * 1000);
 </script>
 </body>
 </html>

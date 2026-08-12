@@ -216,6 +216,7 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
         $routes->post('rating/imports/(:num)/approve', 'RatingGovernanceController::approveImport/$1', ['filter' => 'permission:rating.review']);
         $routes->post('rating/imports/(:num)/reject', 'RatingGovernanceController::rejectImport/$1', ['filter' => 'permission:rating.review']);
         $routes->get('dashboard', 'DashboardController::index');
+        $routes->get('owner-dashboard', 'OwnerDashboardController::index');
 
         $routes->group('ops', ['filter' => 'permission:bookings.view'], function ($routes) {
             $routes->get('available-courts', 'OpsAjaxController::availableCourts');
@@ -367,12 +368,21 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
 
         $routes->group('front-desk', ['filter' => 'permission:bookings.view'], function ($routes) {
             $routes->get('/', 'FrontDeskController::index');
+            $routes->post('check-in/(:num)', 'FrontDeskController::checkIn/$1');
+            $routes->post('complete/(:num)', 'FrontDeskController::complete/$1');
+            $routes->post('no-show/(:num)', 'FrontDeskController::noShow/$1');
+            $routes->post('cancel/(:num)', 'FrontDeskController::cancel/$1');
+            $routes->post('hold/(:num)', 'FrontDeskController::hold/$1');
+            $routes->post('release-hold/(:num)', 'FrontDeskController::releaseHold/$1');
         });
 
         $routes->group('daily-closing', ['filter' => 'permission:payments.view'], function ($routes) {
             $routes->get('/', 'DailyClosingController::index');
             $routes->post('close', 'DailyClosingController::close');
             $routes->post('reopen', 'DailyClosingController::reopen');
+            $routes->get('csv', 'DailyClosingController::csv');
+            $routes->get('print', 'DailyClosingController::print');
+            $routes->get('pdf', 'DailyClosingController::pdf');
         });
 
         $routes->group('operations-report', ['filter' => 'permission:dashboard.view'], function ($routes) {
@@ -526,6 +536,10 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
             $routes->get('/', 'CrmCampaignsController::index');
             $routes->post('store', 'CrmCampaignsController::store');
             $routes->post('launch/(:num)', 'CrmCampaignsController::launch/$1');
+            $routes->post('retry/(:num)', 'CrmCampaignsController::retry/$1');
+            $routes->post('dispatch', 'CrmCampaignsController::dispatch');
+            $routes->post('send-test/(:num)', 'CrmCampaignsController::sendTest/$1');
+            $routes->post('cancel/(:num)', 'CrmCampaignsController::cancel/$1');
         });
 
         // Club, team and social match routes
@@ -556,7 +570,11 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
         $routes->group('memberships', ['filter' => 'permission:memberships.view'], function ($routes) {
             $routes->get('/', 'MembershipsController::index');
             $routes->get('renewals', 'MembershipsController::renewals');
+            $routes->get('renewals/export', 'MembershipsController::exportRenewals');
             $routes->post('renew/(:num)', 'MembershipsController::renew/$1');
+            $routes->post('renewals/bulk', 'MembershipsController::bulkRenew');
+            $routes->post('reminder/(:num)', 'MembershipsController::sendReminder/$1');
+            $routes->post('reminders/run', 'MembershipsController::bulkReminders');
             $routes->get('create', 'MembershipsController::create');
             $routes->post('store', 'MembershipsController::store');
             $routes->get('cancel/(:num)', 'MembershipsController::cancel/$1');

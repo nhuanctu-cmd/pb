@@ -37,7 +37,21 @@ class RatingApi extends BaseController
         $rows = service('ratingEngine')->history($tenantId, $playerId, $discipline, (int) ($this->request->getGet('limit') ?: 50));
         $items = array_map(static function ($row): array {
             $metadata = is_string($row->metadata ?? null) ? (json_decode($row->metadata, true) ?: []) : (array) ($row->metadata ?? []);
-            return ['id' => (int) $row->id, 'match_id' => $row->match_id ? (int) $row->match_id : null, 'before_rating' => $row->before_rating !== null ? (float) $row->before_rating : null, 'after_rating' => $row->after_rating !== null ? (float) $row->after_rating : null, 'delta' => (float) $row->rating_delta, 'expected_performance' => $row->expected_performance !== null ? (float) $row->expected_performance : null, 'actual_performance' => $row->actual_performance !== null ? (float) $row->actual_performance : null, 'reliability_after' => (float) $row->reliability_after, 'reason' => $row->reason, 'processed_at' => $row->processed_at, 'match' => ['games_count' => $metadata['games_count'] ?? null, 'score_margin' => $metadata['score_margin'] ?? null]];
+            return [
+                'id' => (int) $row->id,
+                'match_id' => $row->match_id ? (int) $row->match_id : null,
+                'transaction_type' => (string) $row->transaction_type,
+                'before_rating' => $row->before_rating !== null ? (float) $row->before_rating : null,
+                'after_rating' => $row->after_rating !== null ? (float) $row->after_rating : null,
+                'delta' => (float) $row->rating_delta,
+                'expected_performance' => $row->expected_performance !== null ? (float) $row->expected_performance : null,
+                'actual_performance' => $row->actual_performance !== null ? (float) $row->actual_performance : null,
+                'reliability_after' => (float) $row->reliability_after,
+                'reason' => $row->reason,
+                'status' => $row->status ?? 'applied',
+                'processed_at' => $row->processed_at,
+                'match' => ['games_count' => $metadata['games_count'] ?? null, 'score_margin' => $metadata['score_margin'] ?? null],
+            ];
         }, $rows);
         return $this->success(['player_id' => $playerId, 'discipline' => $discipline, 'items' => $items]);
     }

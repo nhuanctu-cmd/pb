@@ -59,6 +59,10 @@ class ResultCorrectionService
         $db->transComplete();
         if (! $db->transStatus()) return ['success' => false, 'message' => 'Correction transaction failed.'];
         $reversal = service('ratingEngine')->reverseMatch((int) $request->match_id, (int) $originalVersion->id, $match->tenant_id ?? null);
+        if (! empty($match->tenant_id) && (int) $match->tenant_id > 0) {
+            $matchTenant = (int) $match->tenant_id;
+            service('ratingRebuildService')->queueFromMatch($matchTenant, (int) $request->match_id, null, 'correction-approved', ['request_id' => (int) $requestId, 'result_version_id' => (int) $originalVersion->id, 'new_result_version_id' => $versionId]);
+        }
         return ['success' => true, 'new_result_version_id' => (int) $versionId, 'reversal' => $reversal, 'request' => $this->requestModel->find($requestId)];
     }
 

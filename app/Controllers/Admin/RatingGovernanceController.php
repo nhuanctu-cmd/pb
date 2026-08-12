@@ -42,9 +42,30 @@ class RatingGovernanceController extends BaseController
         return redirect()->back()->with('success', 'Đã xử lý integrity flag.');
     }
 
+    public function approveImport(int $jobId)
+    {
+        return $this->reviewImport($jobId, 'approve');
+    }
+
+    public function rejectImport(int $jobId)
+    {
+        return $this->reviewImport($jobId, 'reject', true);
+    }
+
     public function adjust()
     {
         $result = service('ratingAdjustmentService')->adjust((int) current_tenant_id(), (int) $this->request->getPost('player_id'), (string) $this->request->getPost('discipline'), (float) $this->request->getPost('rating'), (string) $this->request->getPost('reason'), (int) user_id());
         return redirect()->back()->with($result['success'] ? 'success' : 'error', $result['message'] ?? ($result['success'] ? 'Đã điều chỉnh rating.' : 'Không thể điều chỉnh rating.'));
+    }
+
+    private function reviewImport(int $jobId, string $decision, bool $requiresReason = false)
+    {
+        $tenantId = (int) current_tenant_id();
+        $reason = $this->request->getPost('reason');
+        $result = service('ratingImportService')->reviewForGovernance($tenantId, $jobId, $decision, $requiresReason ? (string) $reason : (string) ($reason ?: null), (int) user_id());
+        if (! empty($result['success'])) {
+            return redirect()->back()->with('success', $result['message'] ?? ('Đã ' . $decision . ' import job.'));
+        }
+        return redirect()->back()->with('error', $result['message'] ?? ('Không thể ' . $decision . ' import job.'));
     }
 }

@@ -150,7 +150,7 @@ class TournamentOperationsService
     private function registrations(int $tournamentId, int $tenantId): array
     {
         return $this->db->table('tournament_registrations r')
-            ->select('r.*, c.name_vi AS category_name, p.full_name AS player_name, pp.full_name AS partner_name')
+            ->select('r.*, c.name_vi AS category_name, p.id AS player_id, pp.id AS partner_player_id, p.full_name AS player_name, pp.full_name AS partner_name')
             ->join('tournament_categories c', 'c.id = r.category_id AND c.tenant_id = r.tenant_id', 'left')
             ->join('players p', 'p.id = r.player_id AND p.tenant_id = r.tenant_id', 'left')
             ->join('players pp', 'pp.id = r.partner_player_id AND pp.tenant_id = r.tenant_id', 'left')

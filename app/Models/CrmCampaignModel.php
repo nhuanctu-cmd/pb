@@ -11,6 +11,6 @@ class CrmCampaignModel extends Model
     protected $useTimestamps = true;
     protected $allowedFields = [
         'tenant_id', 'name', 'channel', 'segment', 'status', 'subject', 'message', 'scheduled_at',
-        'sent_at', 'created_by', 'updated_by',
+        'sent_at', 'throttle_per_minute', 'max_retries', 'created_by', 'updated_by',
     ];
 }

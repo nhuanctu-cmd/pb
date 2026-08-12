@@ -7,6 +7,8 @@ use App\Models\TournamentCategoryModel;
 use App\Models\TournamentModel;
 use App\Models\TournamentRegistrationModel;
 use Config\Database;
+use App\Services\InvoiceService;
+use App\Services\CustomerService;
 
 class TournamentRegistrationService
 {
@@ -14,6 +16,8 @@ class TournamentRegistrationService
     protected TournamentCategoryModel $categoryModel;
     protected TournamentRegistrationModel $registrationModel;
     protected PlayerModel $playerModel;
+    protected InvoiceService $invoiceService;
+    protected CustomerService $customerService;
 
     public function __construct()
     {
@@ -21,6 +25,8 @@ class TournamentRegistrationService
         $this->categoryModel = model(TournamentCategoryModel::class);
         $this->registrationModel = model(TournamentRegistrationModel::class);
         $this->playerModel = model(PlayerModel::class);
+        $this->invoiceService = new InvoiceService();
+        $this->customerService = new CustomerService();
     }
 
     public function registerPlayer(array $data): array
@@ -106,15 +112,90 @@ class TournamentRegistrationService
 
         $category = $this->categoryModel->where('id', $registration->category_id)->where('tenant_id', $registration->tenant_id)->first();
         $tournament = $this->tournamentModel->findForTenant((int) $registration->tournament_id, (int) $registration->tenant_id);
+        if (! $category || ! $tournament) {
+            return ['success' => false, 'message' => 'Không tìm thấy hạng mục hoặc giải đấu của đăng ký.'];
+        }
+
         $amount = (float) ($category->registration_fee ?? $tournament->registration_fee ?? 0);
+        if ($amount <= 0) {
+            $this->registrationModel->update($registrationId, [
+                'invoice_code' => null,
+                'invoice_amount' => 0,
+            ]);
+            return ['success' => true, 'message' => 'Không cần tạo invoice cho đăng ký miễn phí.', 'amount' => 0.0, 'invoice_id' => null];
+        }
+
+        $existingInvoice = $this->invoiceService->getInvoicesByRef('tournament_registration', (int) $registrationId, (int) $registration->tenant_id);
+        if (! empty($existingInvoice)) {
+            $currentInvoice = $existingInvoice[0];
+            $this->registrationModel->update($registrationId, [
+                'invoice_code' => (string) $currentInvoice->invoice_code,
+                'invoice_amount' => (float) $currentInvoice->total_amount,
+            ]);
+            return [
+                'success' => true,
+                'message' => 'Invoice đã tồn tại cho hồ sơ đăng ký này.',
+                'invoice_id' => (int) $currentInvoice->id,
+                'invoice_code' => (string) $currentInvoice->invoice_code,
+                'amount' => (float) $currentInvoice->total_amount,
+            ];
+        }
+
         $invoiceCode = 'TRN-' . date('ymd') . '-' . str_pad((string) $registrationId, 5, '0', STR_PAD_LEFT);
+        $createdBy = property_exists($registration, 'created_by') ? $registration->created_by : null;
+        $actorId = (int) ($createdBy ?: user_id() ?: 0);
+        $customerPayload = [
+            'player_id' => (int) ($registration->player_id ?: 0),
+            'customer_name' => (string) ($registration->contact_name ?? ''),
+            'customer_phone' => (string) ($registration->contact_phone ?? ''),
+            'customer_email' => (string) ($registration->contact_email ?? ''),
+        ];
+        $customerId = null;
+        if ($this->customerService->available()) {
+            $resolvedCustomer = $this->customerService->resolveForBooking((int) $registration->tenant_id, $customerPayload, $actorId ?: null);
+            if ($resolvedCustomer['success']) {
+                $customerId = (int) $resolvedCustomer['customer_id'];
+            }
+        }
+
+        try {
+            $branchId = ! empty($tournament->branch_id) ? (int) $tournament->branch_id : null;
+            $invoice = $this->invoiceService->createInvoice((int) $registration->tenant_id, $branchId, $invoiceCode, (float) $amount, [
+                'customer_type' => ! empty($registration->player_id) ? 'player' : 'guest',
+                'player_id' => ! empty($registration->player_id) ? (int) $registration->player_id : null,
+                'ref_type' => 'tournament_registration',
+                'ref_id' => (int) $registrationId,
+                'created_by' => $actorId ?: null,
+                'note' => 'Tournament registration #' . (int) $registration->id,
+            ]);
+        } catch (\Throwable $exception) {
+            return [
+                'success' => false,
+                'message' => 'Không thể tạo invoice cho hồ sơ đăng ký. ' . $exception->getMessage(),
+                'code' => 'INVOICE_CREATE_ERROR',
+            ];
+        }
 
         $this->registrationModel->update($registrationId, [
-            'invoice_code' => $invoiceCode,
+            'invoice_code' => $invoice->invoice_code,
             'invoice_amount' => $amount,
         ]);
 
-        return ['success' => true, 'invoice_code' => $invoiceCode, 'amount' => $amount];
+        if ($customerId) {
+            $this->customerService->recordTimeline((int) $registration->tenant_id, $customerId, 'tournament_registration_invoiced', 'Tạo hóa đơn đăng ký giải', [
+                'registration_id' => (int) $registrationId,
+                'invoice_code' => $invoice->invoice_code,
+                'invoice_id' => (int) $invoice->id,
+                'amount' => $amount,
+            ], 'Hệ thống tự tạo invoice khi đăng ký giải đấu.', $actorId ?: null, 'tournament_registration', (int) $registrationId);
+        }
+
+        return [
+            'success' => true,
+            'invoice_id' => (int) $invoice->id,
+            'invoice_code' => (string) $invoice->invoice_code,
+            'amount' => $amount,
+        ];
     }
 
     private function createRegistration(array $data): array

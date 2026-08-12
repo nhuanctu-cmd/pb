@@ -48,7 +48,7 @@ class LiveScoreService
         return $matches;
     }
 
-    public function getTvDisplayData(?int $tenantId = null, ?int $tournamentId = null): array
+    public function getTvDisplayData(?int $tenantId = null, ?int $tournamentId = null, array $options = []): array
     {
         $matches = $this->getLiveMatches($tenantId, $tournamentId);
         $live = array_values(array_filter($matches, static fn ($m) => in_array(($m->status ?? ''), ['on_court', 'running', 'in_progress'], true)));
@@ -72,6 +72,18 @@ class LiveScoreService
             $config = $builder->orderBy('id', 'DESC')->get()->getRow();
         }
 
+        $sequence = $this->normalizeTvSequence($options['sequence'] ?? null);
+        $refreshSeconds = (int) ($options['refresh_seconds'] ?? 5);
+        if ($refreshSeconds <= 0) {
+            $refreshSeconds = 5;
+        }
+        if ($config && $config->refresh_seconds > 0) {
+            $refreshSeconds = (int) $config->refresh_seconds;
+        }
+        if (isset($options['refresh_seconds']) && is_numeric($options['refresh_seconds']) && (int) $options['refresh_seconds'] > 0) {
+            $refreshSeconds = (int) $options['refresh_seconds'];
+        }
+
         return [
             'config' => $config,
             'tournament' => $tournament,
@@ -79,13 +91,8 @@ class LiveScoreService
             'called_matches' => $called,
             'next_matches' => $next,
             'result_matches' => array_slice(array_reverse($results), 0, 6),
-            'slides' => array_values(array_filter([
-                ! empty($live) ? 'live' : null,
-                ! empty($called) ? 'call' : null,
-                ! empty($next) ? 'next' : null,
-                ! empty($results) ? 'results' : null,
-            ])),
-            'refresh_seconds' => (int) ($config->refresh_seconds ?? 5),
+            'slides' => $sequence,
+            'refresh_seconds' => $refreshSeconds,
             'show_sponsor' => (bool) ($config->show_sponsor ?? true),
             'show_next_matches' => (bool) ($config->show_next_matches ?? true),
         ];
@@ -142,5 +149,28 @@ class LiveScoreService
     protected function fieldExists(string $table, string $field): bool
     {
         return $this->db->tableExists($table) && $this->db->fieldExists($field, $table);
+    }
+
+    private function normalizeTvSequence($sequence): array
+    {
+        $allowed = ['live', 'next', 'call', 'results'];
+        if (is_string($sequence)) {
+            $sequence = preg_split('/\s*,\s*/', trim($sequence), -1, PREG_SPLIT_NO_EMPTY);
+        }
+
+        if (! is_array($sequence) || empty($sequence)) {
+            return $allowed;
+        }
+
+        $normalized = [];
+        foreach ($sequence as $item) {
+            $value = strtolower(trim((string) $item));
+            if (! in_array($value, $allowed, true) || in_array($value, $normalized, true)) {
+                continue;
+            }
+            $normalized[] = $value;
+        }
+
+        return $normalized ?: $allowed;
     }
 }

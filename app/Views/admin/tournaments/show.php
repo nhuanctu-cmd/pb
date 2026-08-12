@@ -1,5 +1,10 @@
 <?php
 $stats = $tournamentStats ?? [];
+$finance = $finance ?? [];
+$financeSource = match ((string) ($finance['source'] ?? 'none')) {
+    'invoice' => 'Dữ liệu hóa đơn',
+    default => 'Từ đăng ký giải',
+};
 $status = (string) ($tournament->status ?? 'draft');
 $categoryCount = count($categories ?? []);
 $registrationCount = (int) ($stats['registrations'] ?? 0);
@@ -157,7 +162,9 @@ $statusSteps = [
             ['Đã duyệt', (int) ($stats['approved'] ?? 0), (int) ($stats['pending'] ?? 0) . ' chờ xử lý', 'bi-person-check', 'success'],
             ['Check-in', (int) ($stats['checked_in'] ?? 0), (int) ($stats['paid'] ?? 0) . ' đã thanh toán', 'bi-qr-code-scan', 'warning'],
             ['Lịch thi đấu', $matchCount, $completedMatchCount . ' trận hoàn tất', 'bi-calendar3', 'info'],
-            ['Doanh thu dự kiến', format_money($stats['expected_revenue'] ?? 0), (int) ($stats['rejected'] ?? 0) . ' hồ sơ từ chối', 'bi-cash-stack', 'success'],
+            ['Doanh thu dự kiến', format_money((float) ($finance['expected_revenue'] ?? 0)), (int) ($stats['rejected'] ?? 0) . ' hồ sơ từ chối', 'bi-cash-stack', 'success'],
+            ['Đã đối soát', format_money((float) ($finance['collected_revenue'] ?? 0)), (int) ($finance['paid_registrations'] ?? 0) . ' thanh toán', 'bi-wallet2', 'warning'],
+            ['Còn thiếu', format_money((float) ($finance['outstanding_revenue'] ?? 0)), (int) ($finance['unpaid_registrations'] ?? 0) . ' hồ sơ', 'bi-exclamation-triangle', 'danger'],
         ]; ?>
         <?php foreach ($kpis as $kpi): ?>
             <div class="col-sm-6 col-xl"><div class="tour-kpi"><div class="kpi-icon"><i class="bi <?= $kpi[3] ?>"></i></div><div class="kpi-label"><?= esc($kpi[0]) ?></div><div class="kpi-value"><?= is_string($kpi[1]) ? esc($kpi[1]) : number_format($kpi[1]) ?></div><div class="kpi-note"><?= esc($kpi[2]) ?></div></div></div>
@@ -227,7 +234,7 @@ $statusSteps = [
 
     <div class="row g-3">
         <div class="col-lg-7">
-            <section class="tour-card"><div class="tour-card-header"><h2><i class="bi bi-file-earmark-text me-2 text-primary"></i>Điều lệ & thông tin tài chính</h2><a href="/admin/tournaments/edit/<?= (int) $tournament->id ?>" class="small text-decoration-none">Chỉnh sửa</a></div><div class="tour-card-body"><div class="tour-info-list"><div class="tour-info-row"><span>Thời gian tổ chức</span><strong><?= esc(format_date($tournament->start_date ?? null)) ?> – <?= esc(format_date($tournament->end_date ?? null)) ?></strong></div><div class="tour-info-row"><span>Thời gian nhận đăng ký</span><strong><?= esc(format_datetime($tournament->registration_start ?? null)) ?> – <?= esc(format_datetime($tournament->registration_end ?? null)) ?></strong></div><div class="tour-info-row"><span>Phí mặc định</span><strong><?= format_money($tournament->registration_fee ?? 0) ?></strong></div><div class="tour-info-row"><span>Doanh thu dự kiến</span><strong><?= format_money($stats['expected_revenue'] ?? 0) ?></strong></div></div><div class="mt-3 p-3 rounded-3 bg-light" style="white-space:pre-wrap;max-height:240px;overflow:auto;"><?= esc($rule->rule_content_vi ?? 'Chưa nhập nội dung điều lệ.') ?></div></div></section>
+            <section class="tour-card"><div class="tour-card-header"><h2><i class="bi bi-file-earmark-text me-2 text-primary"></i>Điều lệ & thông tin tài chính</h2><a href="/admin/tournaments/edit/<?= (int) $tournament->id ?>" class="small text-decoration-none">Chỉnh sửa</a></div><div class="tour-card-body"><div class="tour-info-list"><div class="tour-info-row"><span>Thời gian tổ chức</span><strong><?= esc(format_date($tournament->start_date ?? null)) ?> – <?= esc(format_date($tournament->end_date ?? null)) ?></strong></div><div class="tour-info-row"><span>Thời gian nhận đăng ký</span><strong><?= esc(format_datetime($tournament->registration_start ?? null)) ?> – <?= esc(format_datetime($tournament->registration_end ?? null)) ?></strong></div><div class="tour-info-row"><span>Phí mặc định</span><strong><?= format_money((float) ($tournament->registration_fee ?? 0)) ?></strong></div><div class="tour-info-row"><span>Nguồn tài chính</span><strong><?= esc($financeSource) ?></strong></div><div class="tour-info-row"><span>Doanh thu dự kiến</span><strong><?= format_money((float) ($finance['expected_revenue'] ?? 0)) ?></strong></div><div class="tour-info-row"><span>Đã thu</span><strong><?= format_money((float) ($finance['collected_revenue'] ?? 0)) ?></strong></div><div class="tour-info-row"><span>Còn thiếu</span><strong><?= format_money((float) ($finance['outstanding_revenue'] ?? 0)) ?></strong></div><div class="tour-info-row"><span>Nhà tài trợ</span><strong><?= (int) (($finance['sponsors']['total'] ?? 0)) ?> đối tác · <?= (int) (($finance['sponsors']['active'] ?? 0)) ?> đang hợp tác</strong></div></div><div class="mt-3 p-3 rounded-3 bg-light" style="white-space:pre-wrap;max-height:240px;overflow:auto;"><?= esc($rule->rule_content_vi ?? 'Chưa nhập nội dung điều lệ.') ?></div></div></section>
         </div>
         <div class="col-lg-5">
             <section class="tour-card"><div class="tour-card-header"><h2><i class="bi bi-award me-2 text-primary"></i>Nhà tài trợ</h2><span class="small text-muted"><?= count($sponsors ?? []) ?> đối tác</span></div><div class="tour-card-body"><?php foreach (($sponsors ?? []) as $sponsor): ?><div class="tour-sponsor"><?php if (! empty($sponsor->logo)): ?><img src="<?= esc($sponsor->logo) ?>" alt=""><?php else: ?><span class="kpi-icon"><i class="bi bi-building"></i></span><?php endif; ?><div><strong><?= esc($sponsor->sponsor_name ?? 'Nhà tài trợ') ?></strong><?php if (! empty($sponsor->sponsor_level)): ?><div class="small text-muted"><?= esc($sponsor->sponsor_level) ?></div><?php endif; ?></div></div><?php endforeach; ?><?php if (empty($sponsors)): ?><div class="tour-empty"><i class="bi bi-building d-block fs-3 mb-2"></i>Chưa có nhà tài trợ.</div><?php endif; ?></div></section>

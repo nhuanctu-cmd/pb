@@ -44,7 +44,60 @@ $playerUrl = '/players/' . esc($player->player_code ?? $player->id);
             <div><span>CAREER HIGH</span><strong><?= $primary?->highest_rating ? number_format((float) $primary->highest_rating, 3) : '—' ?></strong><small>Canonical best</small></div>
             <div><span>VERIFICATION</span><strong><?= esc(($player->verification_status ?? 'unverified') === 'official' ? 'Official' : 'Verified') ?></strong><small><?= $player->verified_at ? esc($date($player->verified_at)) : 'Public record' ?></small></div>
         </div>
-        <section class="profile-section" id="history"><div class="section-title"><div><span class="eyebrow">01 / RATING JOURNEY</span><h2>Diễn biến năng lực</h2></div><span class="section-count"><?= count($ratingHistory ?? []) ?> records</span></div><?php if ($ratingHistory): ?><div class="rating-timeline"><?php foreach (array_reverse($ratingHistory) as $item): ?><div class="timeline-item"><span class="timeline-dot <?= ((float) $item->rating_delta >= 0) ? 'up' : 'down' ?>"></span><div><strong><?= number_format((float) ($item->after_rating ?? 0), 3) ?></strong><p><?= esc($item->reason ?: ucfirst((string) $item->transaction_type)) ?> · <?= esc($item->discipline ?: 'singles') ?></p></div><b class="delta <?= ((float) $item->rating_delta >= 0) ? 'positive' : 'negative' ?>"><?= ((float) $item->rating_delta >= 0 ? '+' : '') . number_format((float) $item->rating_delta, 3) ?></b><time><?= esc($date($item->created_at)) ?></time></div><?php endforeach; ?></div><?php else: ?><div class="empty-state">Chưa có lịch sử Rating công khai.</div><?php endif; ?></section>
+        <section class="profile-section" id="history">
+            <div class="section-title">
+                <div><span class="eyebrow">01 / RATING JOURNEY</span><h2>Diễn biến năng lực</h2></div>
+                <span class="section-count"><?= count($ratingHistory ?? []) ?> records</span>
+            </div>
+            <?php if ($ratingHistory): ?>
+                <div class="history-chart-shell">
+                    <div class="history-chart-toolbar">
+                        <span id="history-mode">Dạng tuyến tính</span>
+                        <span class="history-mode">Bước gần nhất → Cũ nhất</span>
+                    </div>
+                    <svg class="rating-history-chart" viewBox="0 0 760 240" role="img" aria-label="Biểu đồ lịch sử Rating">
+                        <?php
+                        $chartItems = array_values(array_slice(array_reverse($ratingHistory), 0, 12));
+                        $values = array_map(static fn ($row) => (float) ($row->after_rating ?? 0), $chartItems);
+                        $times = array_map(static fn ($row) => esc($date($row->processed_at ?: $row->created_at)), $chartItems);
+                        $min = (float) min($values) - 0.01;
+                        $max = (float) max($values) + 0.01;
+                        $span = max(0.001, $max - $min);
+                        $width = 712;
+                        $height = 180;
+                        $left = 24;
+                        $top = 20;
+                        $points = [];
+                        foreach ($chartItems as $index => $item) {
+                            $x = $left + (count($chartItems) === 1 ? $width / 2 : $index * ($width / max(1, count($chartItems) - 1)));
+                            $y = $top + $height - (((float) ($item->after_rating ?? 0) - $min) / $span) * $height;
+                            $points[] = $x . ',' . round((float) $y, 2);
+                        }
+                        $pointString = implode(' ', $points);
+                        ?>
+                        <line x1="<?= $left ?>" y1="<?= $top + $height ?>" x2="<?= $left + $width ?>" y2="<?= $top + $height ?>" class="history-axis"></line>
+                        <?php if (! empty($pointString)): ?>
+                            <polyline points="<?= esc($pointString) ?>" class="history-line"></polyline>
+                            <?php foreach ($points as $index => $point): ?>
+                                <?php [$cx, $cy] = array_map('trim', explode(',', $point)); ?>
+                                <circle cx="<?= esc($cx) ?>" cy="<?= esc($cy) ?>" r="4" class="history-point">
+                                    <title><?= number_format($values[$index], 3) ?> · <?= esc($times[$index] ?? '') ?> · <?= esc($chartItems[$index]->reason ?: ucfirst((string) ($chartItems[$index]->transaction_type ?? 'impact')) ) ?></title>
+                                </circle>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <text x="380" y="125" text-anchor="middle" fill="#6c7f83" font-size="13">Chưa có điểm để vẽ biểu đồ.</text>
+                        <?php endif; ?>
+                    </svg>
+                </div>
+                <div class="rating-timeline">
+                    <?php foreach ($chartItems as $item): ?>
+                        <div class="timeline-item"><span class="timeline-dot <?= ((float) $item->rating_delta >= 0) ? 'up' : 'down' ?>"></span><div><strong><?= number_format((float) ($item->after_rating ?? 0), 3) ?></strong><p><?= esc($item->reason ?: ucfirst((string) $item->transaction_type)) ?> · <?= esc($item->discipline ?: 'singles') ?></p></div><b class="delta <?= ((float) $item->rating_delta >= 0) ? 'positive' : 'negative' ?>"><?= ((float) $item->rating_delta >= 0 ? '+' : '') . number_format((float) $item->rating_delta, 3) ?></b><time><?= esc($date($item->created_at)) ?></time></div>
+                    <?php endforeach; ?>
+                </div>
+            <?php else: ?>
+                <div class="empty-state">Chưa có lịch sử Rating công khai.</div>
+            <?php endif; ?>
+        </section>
         <section class="profile-section" id="matches"><div class="section-title"><div><span class="eyebrow">02 / COMPETITIVE RECORD</span><h2>Lịch sử thi đấu</h2></div><span class="section-count"><?= count($matches ?? []) ?> matches</span></div><?php if ($matches): ?><div class="match-list"><?php foreach ($matches as $match): ?><div class="athlete-match"><span class="match-result <?= ($match->result ?? '') === 'won' ? 'win' : (($match->result ?? '') === 'lost' ? 'loss' : 'draw') ?>"><?= strtoupper((string) ($match->result ?? '—')) ?></span><div><strong><?= esc($match->opponent_name ?: 'Đối thủ chưa công bố') ?></strong><small><?= esc($match->tournament_name ?: 'Official match') ?> · <?= esc($date($match->match_date)) ?></small></div><b><?= esc($match->score ?: '—') ?></b><span class="match-arrow">↗</span></div><?php endforeach; ?></div><?php else: ?><div class="empty-state">Chưa có trận đấu official được công khai.</div><?php endif; ?></section>
         <section class="profile-section" id="articles"><div class="section-title"><div><span class="eyebrow">03 / ATHLETE VOICE</span><h2>Bài viết liên quan</h2></div><span class="section-count"><?= count($posts ?? []) ?> posts</span></div><?php if ($posts): ?><div class="article-grid"><?php foreach ($posts as $post): ?><article><span><?= esc(strtoupper((string) $post->type)) ?> · <?= esc($date($post->created_at)) ?></span><h3><?= esc($post->title) ?></h3><p><?= esc(mb_strimwidth(strip_tags((string) $post->body), 0, 150, '…', 'UTF-8')) ?></p><a href="/articles/<?= (int) $post->id ?>">Đọc nội dung ↗</a></article><?php endforeach; ?></div><?php else: ?><div class="empty-state">Vận động viên chưa có bài viết công khai.</div><?php endif; ?></section>
     </div>

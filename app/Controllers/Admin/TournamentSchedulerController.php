@@ -50,6 +50,9 @@ class TournamentSchedulerController extends BaseController
     {
         $categoryId = (int) $this->request->getPost('category_id');
         $groups = (int) ($this->request->getPost('groups') ?: 2);
+        $forceRebuild = (bool) $this->request->getPost('force_rebuild');
+        $seedIndex = (int) ($this->request->getPost('seed_index') ?: 0);
+        $reason = trim((string) $this->request->getPost('rebuild_reason'));
         if (! $categoryId) {
             return redirect()->back()->with('error', 'Vui lòng nhập category_id.');
         }
@@ -62,7 +65,16 @@ class TournamentSchedulerController extends BaseController
         foreach ($createdGroups as $group) {
             $this->scheduler->generateRoundRobinMatches((int) $group->id);
         }
-        $this->scheduler->generateKnockoutBracket($categoryId);
+        try {
+            $this->scheduler->generateKnockoutBracketWithOptions($categoryId, [
+                'force' => $forceRebuild,
+                'seed_index' => $seedIndex,
+                'reason' => $reason !== '' ? $reason : 'Rebuild draw theo admin',
+                'actor_id' => (int) user_id(),
+            ]);
+        } catch (\RuntimeException $ex) {
+            return redirect()->back()->with('error', $ex->getMessage());
+        }
         $this->scheduler->assignCourts($categoryId);
         $this->scheduler->assignTimeSlots($categoryId);
 

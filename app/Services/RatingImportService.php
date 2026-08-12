@@ -105,6 +105,43 @@ class RatingImportService
         return ['success' => true, 'job_id' => $jobId, 'status' => 'imported', 'imported_claims' => $count, 'note' => 'Đã tạo skill claims; official rating chỉ phát sinh từ official match engine.'];
     }
 
+    public function reviewForGovernance(int $tenantId, int $jobId, string $decision, ?string $reason = null, ?int $actorId = null): array
+    {
+        $decision = strtolower(trim($decision));
+        if (! in_array($decision, ['approve', 'reject'], true)) return ['success' => false, 'message' => 'Quyết định không hợp lệ.'];
+        $job = $this->job($tenantId, $jobId);
+        if (! $job) return ['success' => false, 'message' => 'Import job không tồn tại.'];
+
+        if ($decision === 'approve') {
+            if (! in_array($job->status, ['validated', 'verified'], true)) {
+                return ['success' => false, 'message' => 'Import job chưa ở trạng thái sẵn sàng duyệt.'];
+            }
+            if ($job->status === 'validated') {
+                $verified = $this->verifySource($tenantId, $jobId, true);
+                if (! ($verified['success'] ?? false)) {
+                    return ['success' => false, 'message' => $verified['message'] ?? 'Không thể chuyển sang verified.'];
+                }
+            }
+            $import = $this->importClaims($tenantId, $jobId);
+            if (! ($import['success'] ?? false)) {
+                return ['success' => false, 'message' => $import['message'] ?? 'Import thất bại khi tạo claim.'];
+            }
+            $this->appendReviewMetadata($tenantId, $jobId, $actorId, 'approve', null);
+            return ['success' => true, 'job_id' => $jobId, 'status' => 'imported', 'imported_claims' => $import['imported_claims'] ?? 0];
+        }
+
+        $reason = trim((string) $reason);
+        if ($reason === '') return ['success' => false, 'message' => 'Lý do từ chối bắt buộc phải có.'];
+        if (in_array($job->status, ['imported', 'rejected'], true)) return ['success' => false, 'message' => 'Import job đã được khóa xử lý.'];
+
+        $this->db->table('rating_import_jobs')->where('id', $jobId)->update([
+            'status' => 'rejected',
+            'metadata' => json_encode($this->buildReviewMetadata((int) $job->tenant_id, (int) $actorId, 'reject', $reason)),
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+        return ['success' => true, 'job_id' => $jobId, 'status' => 'rejected'];
+    }
+
     private function ready(): bool { return $this->db->tableExists('rating_import_jobs') && $this->db->tableExists('rating_import_rows') && $this->db->tableExists('player_skill_claims'); }
     private function job(int $tenantId, int $jobId): ?object { return $this->db->table('rating_import_jobs')->where('id', $jobId)->where('tenant_id', $tenantId)->get()->getRow(); }
     private function rows(int $jobId): array { return $this->db->table('rating_import_rows')->where('job_id', $jobId)->orderBy('row_number')->get()->getResult(); }
@@ -121,4 +158,24 @@ class RatingImportService
         return $this->db->table('player_skill_claims')->where('tenant_id', $tenantId)->where('player_id', $playerId)->where('external_reference', $reference)->countAllResults() > 0;
     }
     private function transition(int $tenantId, int $jobId, string $to, array $from): array { $job = $this->job($tenantId, $jobId); if (! $job || ! in_array($job->status, $from, true)) return ['success' => false, 'message' => 'Import job không ở bước hợp lệ.']; $this->db->table('rating_import_jobs')->where('id', $jobId)->update(['status' => $to, 'updated_at' => date('Y-m-d H:i:s')]); return ['success' => true, 'job_id' => $jobId, 'status' => $to, 'next_step' => $to === 'previewed' ? 'identity_matching' : null]; }
+    private function buildReviewMetadata(int $tenantId, ?int $actorId, string $decision, ?string $reason): array
+    {
+        return [
+            'governance_review' => [
+                'tenant_id' => $tenantId,
+                'decision' => $decision,
+                'actor_id' => $actorId,
+                'reason' => $reason,
+                'reviewed_at' => date('Y-m-d H:i:s'),
+            ],
+        ];
+    }
+    private function appendReviewMetadata(int $tenantId, int $jobId, ?int $actorId, string $decision, ?string $reason): void
+    {
+        $existing = $this->db->table('rating_import_jobs')->select('metadata')->where('id', $jobId)->get()->getRow();
+        $metadata = $existing && ! empty($existing->metadata) ? json_decode((string) $existing->metadata, true) : [];
+        if (! is_array($metadata)) $metadata = [];
+        $metadata['governance_review'] = $this->buildReviewMetadata($tenantId, $actorId, $decision, $reason);
+        $this->db->table('rating_import_jobs')->where('id', $jobId)->update(['metadata' => json_encode($metadata), 'updated_at' => date('Y-m-d H:i:s')]);
+    }
 }

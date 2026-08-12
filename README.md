@@ -1,69 +1,183 @@
-# CodeIgniter 4 Application Starter
+# PICKLEBALL NATIONAL OS  
+**National Pickleball Operating System (Pickball Platform v2)**  
+Platform booking + tournament + rating + ranking + CRM + marketplace + partner API, built on **CodeIgniter 4.7**.
 
-## What is CodeIgniter?
+## Bản chất dự án
 
-CodeIgniter is a PHP full-stack web framework that is light, fast, flexible and secure.
-More information can be found at the [official site](https://codeigniter.com).
+Repository này là hệ sinh thái vận hành pickleball toàn diện cho:
+- Hệ thống sân/CLB (booking, lịch sân, thiết bị, POS, membership)
+- Điều phối giải đấu (lập lịch, bảng đấu, kiểm soát trận, live score)
+- Động cơ xếp hạng/đánh giá tay nghề (rating engine + integrity + governance)
+- Ranking quốc gia theo cầu thủ/từng mùa giải/chuỗi thi đấu
+- CRM cho quản lý khách hàng/chương trình marketing
+- Hệ thống API/đối tác mở (public, partner, internal)
 
-This repository holds a composer-installable app starter.
-It has been built from the
-[development repository](https://github.com/codeigniter4/CodeIgniter4).
+## Tính năng hiện có (đã triển khai)
 
-More information about the plans for version 4 can be found in [CodeIgniter 4](https://forum.codeigniter.com/forumdisplay.php?fid=28) on the forums.
+### 1) Hệ điều hành nền tảng
+- Multi-tenant: Tenant/Facility/Branch/Club/Role/Permission/RBAC
+- Authentication, Session, Token-based API authentication
+- Hệ thống settings, menu, dashboard, report, audit trail, notifications
+- Mở rộng theo module, có command, service, filter riêng
 
-You can read the [user guide](https://codeigniter.com/user_guide/)
-corresponding to the latest version of the framework.
+### 2) Quản lý cơ sở & đặt sân
+- Quản lý cơ sở (Facilities): thông tin, dashboard, chi nhánh, câu lạc bộ liên kết
+- Quản lý sân (Courts): trạng thái sân theo thời gian thực, thiết bị, timeline
+- Đặt sân (Bookings): tạo/cập nhật/hủy, check-in QR, booking drawer/recurring/điều phối
+- Open play / chờ / walk-in / đội ngũ tiền sảnh
+- Pricing rules, membership packages, coupon/plan tích hợp theo nhu cầu vận hành
 
-## Installation & updates
+### 3) Thanh toán & vận hành nội bộ
+- POS, inventory/invoice, ví người dùng, lịch sử giao dịch
+- Daily closing & reconciliation
+- Job/queue monitor, dead-letter, retry job
+- Integrations webhook + vận hành hệ thống qua admin ops
 
-`composer create-project codeigniter4/appstarter` then `composer update` whenever
-there is a new release of the framework.
+### 4) Tournament & thi đấu
+- Tournament engine: tạo/lập lịch/quản lý danh sách/điều phối lịch
+- Tournament registration, eligibility gate, tournament templates, bracket/sân đấu
+- Điều phối match, điều khiển live score, control room
+- Kết nối result network cho luồng trận tử trận chuẩn hóa (unified match)
 
-When updating, check the release notes to see if there are any changes you might need to apply
-to your `app` folder. The affected files can be copied or merged from
-`vendor/codeigniter4/framework/app`.
+### 5) Rating, Ranking & Integrity
+- Profile rating chuẩn hóa + player rating profile
+- Rating history, transaction ledger, policy, adjustment, reliability
+- Import/repair/correction workflow
+- Governance review: tranh chấp, integrity flag, dispute/appeal handling
+- Ranking snapshot/leaderboard (public + admin) và nền tảng mở rộng cho cấp tổ chức
 
-## Setup
+### 6) Quản trị vận hành & CRM
+- Customer management, campaign, data quality, front desk, media
+- Operations report, growth dashboard, governance/sanction, competitor/audit logic
+- Livestream channel + control pages
+- Notification & message flow theo workflow nghiệp vụ
 
-Copy `env` to `.env` and tailor for your app, specifically the baseURL
-and any database settings.
+### 7) APIs
+- API Public v1 (`/api/public/v1`)
+- API Partner v1 (`/api/partner/v1`) với OAuth/key + quyền theo scope
+- Internal API (`/api/v1`) cho nền tảng nội bộ
+- OpenAPI spec: `docs/api/openapi.yaml`
 
-## Important Change with index.php
+## Cấu trúc thư mục quan trọng
 
-`index.php` is no longer in the root of the project! It has been moved inside the *public* folder,
-for better security and separation of components.
+```text
+app/
+  Controllers/      # Web + Player + Public + Referee + Admin + Api
+  Models/           # Domain models
+  Services/         # Domain services
+  Filters/          # Auth, RBAC, rate limit, partner auth...
+  Commands/         # CLI commands (rating rebuild, webhook deliver...)
+  Database/
+    Migrations/
+    Seeds/
+  Views/
+docs/               # Tài liệu thiết kế & vận hành
+public/             # CSS/JS assets, images, static
+tests/              # PHPUnit feature + unit tests
+```
 
-This means that you should configure your web server to "point" to your project's *public* folder, and
-not to the project root. A better practice would be to configure a virtual host to point there. A poor practice would be to point your web server to the project root and expect to enter *public/...*, as the rest of your logic and the
-framework are exposed.
+## Yêu cầu môi trường
 
-**Please** read the user guide for a better explanation of how CI4 works!
+- PHP >= 8.2
+- MySQL >= 8.0
+- Composer
+- Apache/Nginx hoặc Laragon
+- Extension chuẩn PHP: intl, mbstring, json, curl, mysqlnd
 
-## Repository Management
+## Khởi chạy nhanh (Local)
 
-We use GitHub issues, in our main repository, to track **BUGS** and to track approved **DEVELOPMENT** work packages.
-We use our [forum](http://forum.codeigniter.com) to provide SUPPORT and to discuss
-FEATURE REQUESTS.
+```bash
+git clone git@github.com:nhuanctu-cmd/pb.git
+cd pb
+composer install
+cp env .env    # hoặc dùng file env riêng của bạn
+```
 
-This repository is a "distribution" one, built by our release preparation script.
-Problems with it can be raised on our forum, or as issues in the main repository.
+Trong `.env`, cấu hình:
+- `app.baseURL`
+- `database.default.hostname`
+- `database.default.database` (mặc định: `pickball_db`)
+- `database.default.username`
+- `database.default.password`
 
-## Server Requirements
+Chạy migrate + seed:
 
-PHP version 8.2 or higher is required, with the following extensions installed:
+```bash
+php spark migrate --all
+php spark db:seed RbacSeeder
+php spark db:seed RolePermissionSeeder
+php spark db:seed TenantSeeder
+php spark db:seed SettingSeeder
+php spark db:seed CanonicalRatingDemoSeeder
+php spark db:seed CommercialDemoSeeder
+```
 
-- [intl](http://php.net/manual/en/intl.requirements.php)
-- [mbstring](http://php.net/manual/en/mbstring.installation.php)
+Khởi chạy app:
 
-> [!WARNING]
-> - The end of life date for PHP 7.4 was November 28, 2022.
-> - The end of life date for PHP 8.0 was November 26, 2023.
-> - The end of life date for PHP 8.1 was December 31, 2025.
-> - If you are still using below PHP 8.2, you should upgrade immediately.
-> - The end of life date for PHP 8.2 will be December 31, 2026.
+```bash
+php spark serve --port 8080
+```
 
-Additionally, make sure that the following extensions are enabled in your PHP:
+Mở: `http://localhost:8080`
 
-- json (enabled by default - don't turn it off)
-- [mysqlnd](http://php.net/manual/en/mysqlnd.install.php) if you plan to use MySQL
-- [libcurl](http://php.net/manual/en/curl.requirements.php) if you plan to use the HTTP\CURLRequest library
+## Chuẩn bị môi trường Production (gợi ý)
+- Tắt bootstrap tự động trong `App\Config\App` nếu đang bật cho local auto-bootstrap
+- Dùng `.env` riêng cho prod
+- Chạy migrate/seed theo quy trình deploy
+- Tắt debug và log thông tin nhạy cảm
+- Cấu hình quyền thư mục `writable/`, cache, session, queue worker
+
+## Gọi nhanh API
+- Admin portal: `/admin`
+- Public portal: `/` , `/tournaments`, `/players`, `/rankings`
+- Public API docs endpoint: xem `docs/api/openapi.yaml`
+
+## Scripts / Commands hữu ích
+
+```bash
+php spark migrate --all                       # Chạy migration
+php spark migrate:status                      # Kiểm tra migration state
+php spark db:seed DemoDataSeeder              # Seed dữ liệu demo
+php spark test                               # Chạy toàn bộ test
+composer test                                # Chạy PHPUnit qua script composer
+```
+
+## Kiểm thử
+
+Repo có đầy đủ:
+- Feature tests cho luồng admin/public
+- Unit tests cho service, rating engine, webhook, operations
+- Test integrity và workflow edge cases
+
+## Database dump & backup
+
+Trong dự án đã có script dump mẫu tại thư mục `backups/` (được sinh bởi `mysqldump` theo `pickball_db`).
+
+Import lại:
+
+```bash
+mysql -u root -h 127.0.0.1 -P 3306 pickball_db < backups/<file>.sql
+```
+
+## Roadmap
+
+- Hoàn thiện public portal chi tiết theo sân/tournament/đội
+- Nâng cấp dashboard biểu đồ rating history + governance timeline
+- Mở rộng webhook provider + monitoring hiệu năng theo tenant
+- Tiếp tục harden API contract theo OpenAPI
+
+## Pháp lý & giấy phép
+
+Dự án kế thừa khung CodeIgniter, giữ đầy đủ thông tin bản quyền của framework.  
+Ứng dụng nghiệp vụ của bạn tiếp tục được quản lý tại repo này theo quy ước team.
+
+## Đóng góp
+
+1. Tạo nhánh feature
+2. Thực hiện thay đổi
+3. Chạy test
+4. Tạo PR
+
+---
+
+Repo link: https://github.com/nhuanctu-cmd/pb

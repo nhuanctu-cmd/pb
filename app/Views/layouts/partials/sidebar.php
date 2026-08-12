@@ -350,6 +350,7 @@ $allMenu = [
             'active'=> 'admin/facilities',
             'perm'  => 'facilities.view',
             'children' => [
+                ['label' => 'Control Room sân & CLB', 'icon' => 'bi-speedometer2', 'url' => '/admin/venue-operations', 'active' => 'admin/venue-operations', 'perm' => 'facilities.view'],
                 ['label' => 'Danh sách cụm sân', 'icon' => 'bi-buildings', 'url' => '/admin/facilities', 'active' => 'admin/facilities', 'perm' => 'facilities.view'],
                 ['label' => 'Tạo cụm sân mới', 'icon' => 'bi-plus-circle', 'url' => '/admin/facilities/create', 'active' => 'admin/facilities/create', 'perm' => 'facilities.view'],
                 ['label' => 'Xem chi tiết cơ sở', 'icon' => 'bi-grid-3x3-gap', 'url' => $facilityDashboardUrl, 'active' => 'admin/facilities/dashboard', 'perm' => 'facilities.view'],

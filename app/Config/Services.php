@@ -428,4 +428,10 @@ class Services extends CoreServices
         }
         return new \App\Services\TournamentRegistrationService();
     }
+
+    public static function venueOperationsService(bool $getShared = true): \App\Services\VenueOperationsService
+    {
+        if ($getShared) return static::getSharedInstance('venueOperationsService');
+        return new \App\Services\VenueOperationsService();
+    }
 }

@@ -201,6 +201,7 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
     // Auth protected routes
     $routes->group('', ['filter' => 'auth'], function ($routes) {
         $routes->get('rating', 'RatingGovernanceController::index', ['filter' => 'permission:rating.view']);
+        $routes->get('venue-operations', 'VenueOperationsController::index', ['filter' => 'permission:facilities.view']);
         $routes->get('data-quality', 'DataQualityController::index', ['filter' => 'permission:dashboard.view']);
         $routes->get('governance', 'GovernanceController::index', ['filter' => 'permission:rating.review']);
         $routes->post('governance/disputes/(:num)/resolve', 'GovernanceController::resolveDispute/$1', ['filter' => 'permission:rating.review']);
@@ -212,6 +213,8 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
         $routes->post('rating/adjust', 'RatingGovernanceController::adjust', ['filter' => 'permission:rating.adjust']);
         $routes->post('rating/claims/(:num)/verify', 'RatingGovernanceController::verifyClaim/$1', ['filter' => 'permission:rating.review']);
         $routes->post('rating/flags/(:num)/resolve', 'RatingGovernanceController::resolveFlag/$1', ['filter' => 'permission:rating.review']);
+        $routes->post('rating/imports/(:num)/approve', 'RatingGovernanceController::approveImport/$1', ['filter' => 'permission:rating.review']);
+        $routes->post('rating/imports/(:num)/reject', 'RatingGovernanceController::rejectImport/$1', ['filter' => 'permission:rating.review']);
         $routes->get('dashboard', 'DashboardController::index');
 
         $routes->group('ops', ['filter' => 'permission:bookings.view'], function ($routes) {

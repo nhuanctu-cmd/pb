@@ -8,6 +8,8 @@ use CodeIgniter\Router\RouteCollection;
 $routes->get('/', 'Home::index');
 $routes->get('/ranking', 'PublicPortal::ranking', ['namespace' => 'App\Controllers\Public']);
 $routes->get('/players', 'PublicPortal::players', ['namespace' => 'App\Controllers\Public']);
+$routes->get('/players/(:segment)', 'PublicPortal::player/$1', ['namespace' => 'App\Controllers\Public']);
+$routes->get('/articles/(:num)', 'PublicPortal::article/$1', ['namespace' => 'App\Controllers\Public']);
 $routes->get('/matches', 'PublicPortal::matches', ['namespace' => 'App\Controllers\Public']);
 $routes->get('/clubs', 'PublicPortal::clubs', ['namespace' => 'App\Controllers\Public']);
 $routes->get('/calendar', 'PublicPortal::calendar', ['namespace' => 'App\Controllers\Public']);

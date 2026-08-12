@@ -1,0 +1,5 @@
+.article-page{padding-top:72px;padding-bottom:110px;max-width:900px}
+.article-detail{margin-top:28px;padding:clamp(28px,6vw,72px);border:1px solid rgba(21,72,65,.12);border-radius:28px;background:#fff;box-shadow:0 24px 70px rgba(21,72,65,.08)}
+.article-detail h1{max-width:760px;margin:14px 0 18px;font-size:clamp(2rem,5vw,4rem);line-height:1.02;letter-spacing:-.05em;color:#123f39}
+.article-author{color:#65807a}.article-body{margin-top:38px;color:#274f49;font-size:1.08rem;line-height:1.85}
+@media(max-width:620px){.article-page{padding-top:40px}.article-detail{padding:28px 20px;border-radius:18px}.article-detail h1{font-size:2.5rem}}

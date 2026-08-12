@@ -32,10 +32,10 @@
             return;
         }
         if (podium) podium.innerHTML = items.slice(0, 3).map(function (player, index) {
-            return '<a class="podium-card podium-' + (index + 1) + '" href="#rating-history" data-rating-player="' + esc(player.player_id) + '"><span class="podium-rank">#' + esc(player.rank) + '</span><span class="avatar avatar-' + (index + 1) + '">' + esc((player.name || '?').charAt(0).toUpperCase()) + '</span><strong>' + esc(player.name) + '</strong><small>' + esc(player.province || '—') + ' · ' + esc(player.skill_band || 'NR') + ' · Reliability ' + format(player.reliability, 0) + '%</small><b>' + format(player.rating, 3) + ' <small>RATING</small></b></a>';
+            return '<a class="podium-card podium-' + (index + 1) + '" href="/players/' + encodeURIComponent(player.player_code || player.player_id) + '"><span class="podium-rank">#' + esc(player.rank) + '</span><span class="avatar avatar-' + (index + 1) + '">' + esc((player.name || '?').charAt(0).toUpperCase()) + '</span><strong>' + esc(player.name) + '</strong><small>' + esc(player.province || '—') + ' · ' + esc(player.skill_band || 'NR') + ' · Reliability ' + format(player.reliability, 0) + '%</small><b>' + format(player.rating, 3) + ' <small>RATING</small></b></a>';
         }).join('');
         if (body) body.innerHTML = items.map(function (player) {
-            return '<tr><td><b class="rank-number">#' + esc(player.rank) + '</b></td><td><a class="player-cell" href="#rating-history" data-rating-player="' + esc(player.player_id) + '"><span class="mini-avatar">' + esc((player.name || '?').charAt(0).toUpperCase()) + '</span><span><strong>' + esc(player.name) + '</strong><small>' + esc(player.national_player_id || player.player_code || 'National Player') + '</small></span></a></td><td>' + esc(player.province || '—') + '</td><td>' + esc(player.club || '—') + '</td><td class="mono strong">' + format(player.rating, 3) + '</td><td><span class="skill-chip">' + esc(player.skill_band || 'NR') + '</span></td><td class="mono">' + format(player.reliability, 0) + '%</td><td class="mono">' + format(player.match_count, 0) + '</td><td class="mono strong">' + (Number(player.points || 0) > 0 ? format(player.points, 0) : '—') + '</td></tr>';
+            return '<tr><td><b class="rank-number">#' + esc(player.rank) + '</b></td><td><a class="player-cell" href="/players/' + encodeURIComponent(player.player_code || player.player_id) + '"><span class="mini-avatar">' + esc((player.name || '?').charAt(0).toUpperCase()) + '</span><span><strong>' + esc(player.name) + '</strong><small>' + esc(player.national_player_id || player.player_code || 'National Player') + '</small></span></a></td><td>' + esc(player.province || '—') + '</td><td>' + esc(player.club || '—') + '</td><td class="mono strong">' + format(player.rating, 3) + '</td><td><span class="skill-chip">' + esc(player.skill_band || 'NR') + '</span></td><td class="mono">' + format(player.reliability, 0) + '%</td><td class="mono">' + format(player.match_count, 0) + '</td><td class="mono strong">' + (Number(player.points || 0) > 0 ? format(player.points, 0) : '—') + '</td></tr>';
         }).join('');
     };
     const drawHistory = function (items, playerId, discipline) {
@@ -43,7 +43,7 @@
         historyPanel.hidden = false;
         historyDiscipline.textContent = discipline === 'mixed_doubles' ? 'Mixed doubles' : discipline.charAt(0).toUpperCase() + discipline.slice(1);
         if (!items || !items.length) {
-            historyCaption.textContent = 'Chưa có lịch sử impact transaction công khai cho VĐV này.';
+            historyCaption.textContent = 'Chưa có lịch sử rating công khai cho VĐV này.';
             historyChart.innerHTML = '';
             return;
         }
@@ -57,8 +57,9 @@
             const y = top + height - ((value - min) / Math.max(0.001, max - min)) * height;
             return x.toFixed(1) + ',' + y.toFixed(1);
         }).join(' ');
-        historyCaption.textContent = 'VĐV #' + playerId + ' · ' + ordered.length + ' lần cập nhật Rating · điểm cuối ' + format(values[values.length - 1], 3);
-        historyChart.innerHTML = '<line x1="24" y1="200" x2="704" y2="200" class="history-axis"></line><polyline points="' + points + '" class="history-line"></polyline>' + ordered.map(function (item, index) { const pair = points.split(' ')[index].split(','); return '<circle cx="' + pair[0] + '" cy="' + pair[1] + '" r="4" class="history-point"><title>' + format(item.after_rating, 3) + ' · ' + esc(item.processed_at || '') + '</title></circle>'; }).join('');
+        const types = ordered.map(function (item) { return esc(item.transaction_type || item.reason || 'transaction'); }).join(' · ');
+        historyCaption.textContent = 'VĐV #' + playerId + ' · ' + ordered.length + ' bản ghi (' + types + ') · điểm cuối ' + format(values[values.length - 1], 3);
+        historyChart.innerHTML = '<line x1="24" y1="200" x2="704" y2="200" class="history-axis"></line><polyline points="' + points + '" class="history-line"></polyline>' + ordered.map(function (item, index) { const pair = points.split(' ')[index].split(','); const label = format(item.after_rating, 3) + ' · ' + esc(item.processed_at || '') + ' · ' + esc(item.reason || item.transaction_type || 'transaction'); return '<circle cx="' + pair[0] + '" cy="' + pair[1] + '" r="4" class="history-point"><title>' + label + '</title></circle>'; }).join('');
     };
     const loadHistory = function (playerId) {
         const discipline = rankingShell ? rankingShell.dataset.discipline || 'singles' : 'singles';
@@ -107,7 +108,7 @@
         };
         const render = function (data) {
             const html = renderGroup('Vận động viên', data.players, function (player) {
-                return '<a class="search-result" href="#player-search"><span class="mini-avatar">' + esc((player.full_name || '?').charAt(0).toUpperCase()) + '</span><span><b>' + esc(player.full_name || 'VĐV') + '</b><small>' + esc(player.national_player_id || player.player_code || 'National Player') + ' · ' + esc(player.region || '—') + (player.rating != null ? ' · Rating ' + format(player.rating, 3) : '') + '</small></span></a>';
+                return '<a class="search-result" href="/players/' + encodeURIComponent(player.player_code || player.id) + '"><span class="mini-avatar">' + esc((player.full_name || '?').charAt(0).toUpperCase()) + '</span><span><b>' + esc(player.full_name || 'VĐV') + '</b><small>' + esc(player.national_player_id || player.player_code || 'National Player') + ' · ' + esc(player.region || '—') + (player.rating != null ? ' · Rating ' + format(player.rating, 3) : '') + '</small></span></a>';
             }) + renderGroup('Câu lạc bộ', data.clubs, function (club) {
                 return '<a class="search-result" href="/clubs"><span class="mini-avatar">' + (club.name || 'C').charAt(0).toUpperCase() + '</span><span><b>' + (club.name || 'CLB') + '</b><small>' + (club.province || 'Việt Nam') + '</small></span></a>';
             }) + renderGroup('Giải đấu', data.tournaments, function (event) {

@@ -81,6 +81,105 @@ class PublicPortalService
         return ['players' => $players, 'clubs' => $clubs, 'tournaments' => $tournaments];
     }
 
+    public function topRankingsForPublic(int $tenantId, string $discipline = 'singles'): array
+    {
+        return $this->topRankings($tenantId, $discipline);
+    }
+
+    /** Build one privacy-safe athlete page from canonical rating and public activity. */
+    public function playerProfile(string $identifier, int $tenantId): ?array
+    {
+        try {
+            $query = $this->db->table('players p')
+                ->select('p.*, cp.national_player_id, cp.display_name, cp.slug, cp.avatar_url, cp.club_id, cp.privacy_level, cp.status AS verification_status, cp.verified_at')
+                ->join('player_competitive_profiles cp', 'cp.player_id = p.id AND cp.deleted_at IS NULL', 'left')
+                ->where('p.tenant_id', $tenantId)->where('p.status', 'active')->where('p.deleted_at', null);
+            $query->groupStart()->where('p.player_code', $identifier)->orWhere('cp.national_player_id', $identifier)->orWhere('cp.slug', $identifier)->groupEnd();
+            $player = $query->get()->getRow();
+            if (! $player || (($player->privacy_level ?? 'public') === 'private')) return null;
+
+            $ratings = [];
+            if ($this->db->tableExists('player_rating_profiles')) {
+                $ratings = $this->db->table('player_rating_profiles r')
+            ->select('r.*, d.code AS discipline, d.name AS discipline_name, b.code AS skill_band')
+                    ->join('rating_disciplines d', 'd.id = r.discipline_id', 'left')
+                    ->join('skill_level_bands b', 'b.id = r.skill_band_id', 'left')
+                    ->where('r.tenant_id', $tenantId)->where('r.player_id', $player->id)
+                    ->whereIn('r.status', ['provisional', 'established', 'inactive', 'under_review'])
+                    ->orderBy('r.rating_value', 'DESC')->get()->getResult();
+            }
+
+            $history = [];
+            if ($this->db->tableExists('rating_transactions')) {
+                $history = $this->db->table('rating_transactions rt')
+                    ->select('rt.*, d.code AS discipline')
+                    ->join('rating_disciplines d', 'd.id = rt.discipline_id', 'left')
+                    ->where('rt.tenant_id', $tenantId)->where('rt.player_id', $player->id)->where('rt.status', 'applied')
+                    ->whereIn('rt.transaction_type', ['impact', 'replacement', 'adjustment', 'seed'])
+                    ->orderBy('rt.created_at', 'DESC')->limit(30)->get()->getResult();
+            }
+
+            $matches = $this->publicPlayerMatches((int) $player->id, $tenantId);
+            $posts = [];
+            if ($this->db->tableExists('community_posts')) {
+                $posts = $this->db->table('community_posts cp')
+                    ->select('cp.id, cp.type, cp.title, cp.body, cp.created_at')
+                    ->where('cp.tenant_id', $tenantId)->where('cp.player_id', $player->id)
+                    ->where('cp.status', 'published')->where('cp.deleted_at', null)
+                    ->orderBy('cp.created_at', 'DESC')->limit(6)->get()->getResult();
+            }
+
+            $wins = count(array_filter($matches, static fn ($row) => ($row->result ?? '') === 'won'));
+            $losses = count(array_filter($matches, static fn ($row) => ($row->result ?? '') === 'lost'));
+            $primaryRating = $ratings[0] ?? null;
+            return [
+                'player' => $player,
+                'ratings' => $ratings,
+                'ratingHistory' => $history,
+                'matches' => $matches,
+                'posts' => $posts,
+                'stats' => ['matches' => count($matches), 'wins' => $wins, 'losses' => $losses, 'winRate' => count($matches) ? round($wins / count($matches) * 100) : 0, 'rating' => $primaryRating?->rating_value ?? $player->rating_score ?? null, 'reliability' => $primaryRating?->reliability_score ?? 0],
+                'clubName' => $this->publicClubName((int) ($player->club_id ?? 0), $tenantId),
+            ];
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    public function publicArticle(int $postId, int $tenantId): ?array
+    {
+        if (! $this->db->tableExists('community_posts')) return null;
+
+        $post = $this->db->table('community_posts p')
+            ->select('p.*, pl.full_name AS player_name, pl.player_code')
+            ->join('players pl', 'pl.id = p.player_id', 'left')
+            ->where('p.id', $postId)->where('p.tenant_id', $tenantId)->where('p.status', 'published')
+            ->get()->getRow();
+        if (! $post) return null;
+
+        return ['post' => $post];
+    }
+
+    private function publicPlayerMatches(int $playerId, int $tenantId): array
+    {
+        try {
+            if ($this->db->tableExists('player_match_history')) {
+                $legacy = $this->db->table('player_match_history h')
+                    ->select('h.match_date, h.result, h.score, h.rating_before, h.rating_after, h.rating_delta, h.is_mvp, o.full_name AS opponent_name, t.name_vi AS tournament_name')
+                    ->join('players o', 'o.id = h.opponent_player_id', 'left')->join('tournaments t', 't.id = h.tournament_id', 'left')
+                    ->where('h.tenant_id', $tenantId)->where('h.player_id', $playerId)->orderBy('h.match_date', 'DESC')->limit(20)->get()->getResult();
+                if ($legacy) return $legacy;
+            }
+            if (! $this->db->tableExists('matches') || ! $this->db->tableExists('match_participants')) return [];
+            return $this->db->query("SELECT m.completed_at AS match_date, mp.result, mp.score, o.full_name AS opponent_name, t.name_vi AS tournament_name, m.source_type
+                FROM matches m JOIN match_participants mp ON mp.match_id = m.id AND mp.player_id = ?
+                LEFT JOIN match_participants op ON op.match_id = m.id AND op.side <> mp.side
+                LEFT JOIN players o ON o.id = op.player_id LEFT JOIN tournaments t ON t.id = m.source_id AND m.source_type = 'tournament'
+                WHERE m.tenant_id = ? AND m.status = 'official' AND m.verification_status IN ('verified','official')
+                ORDER BY m.completed_at DESC LIMIT 20", [$playerId, $tenantId])->getResult();
+        } catch (\Throwable) { return []; }
+    }
+
     protected function stats(int $tenantId): array
     {
         $clubTable = $this->db->tableExists('platform_clubs') ? 'platform_clubs' : 'clubs';

@@ -185,43 +185,21 @@ class Tournaments extends BaseController
         if (! $tournament || ! $category || (int) $category->tournament_id !== $tournamentId || ! $player) {
             return redirect()->back()->with('error', 'Giải, hạng mục hoặc vận động viên không hợp lệ.');
         }
-        if (in_array((string) $tournament->status, ['completed', 'cancelled'], true)) {
-            return redirect()->back()->with('error', 'Giải đấu đã kết thúc hoặc bị hủy, không thể thêm đăng ký.');
-        }
-        $registrationModel = model(TournamentRegistrationModel::class);
-        $duplicate = $registrationModel->where('tenant_id', $tenantId)->where('tournament_id', $tournamentId)->where('category_id', $categoryId)->where('player_id', $playerId)->where('deleted_at', null)->first();
-        if ($duplicate) {
-            return redirect()->back()->with('error', 'Vận động viên đã có trong hạng mục này.');
-        }
-
-        $partnerPlayerId = (int) ($this->request->getPost('partner_player_id') ?: 0);
-        if ($partnerPlayerId && ! model(PlayerModel::class)->where('id', $partnerPlayerId)->where('tenant_id', $tenantId)->where('deleted_at', null)->first()) {
-            return redirect()->back()->with('error', 'Vận động viên đánh cặp không thuộc tenant hiện tại.');
-        }
-        $approvedCount = $registrationModel->countApprovedByCategory($categoryId, $tenantId);
-        $approved = $this->request->getPost('quick_approve') === '1';
-        $isFull = (int) ($category->max_teams ?? 0) > 0 && $approvedCount >= (int) $category->max_teams;
-        $approvalStatus = $approved && ! $isFull ? 'approved' : 'pending';
-        $registrationStatus = $approved && ! $isFull ? 'confirmed' : ($isFull ? 'waitlisted' : 'pending');
-        $waitlistPosition = $isFull ? $registrationModel->getNextWaitlistPosition($categoryId, $tenantId) : null;
-        $inserted = $registrationModel->insert([
-            'tenant_id' => $tenantId, 'tournament_id' => $tournamentId, 'category_id' => $categoryId,
-            'player_id' => $playerId, 'partner_player_id' => $partnerPlayerId ?: null,
+        $result = $this->registrationService->registerAdmin([
+            'tenant_id' => $tenantId,
+            'tournament_id' => $tournamentId,
+            'category_id' => $categoryId,
+            'player_id' => $playerId,
+            'partner_player_id' => (int) ($this->request->getPost('partner_player_id') ?: 0),
             'team_id' => $this->nullIfEmpty($this->request->getPost('team_id')),
             'contact_name' => trim((string) ($this->request->getPost('contact_name') ?: $player->full_name)),
             'contact_phone' => trim((string) ($this->request->getPost('contact_phone') ?: ($player->phone ?? ''))),
             'payment_status' => $this->request->getPost('payment_status') ?: 'unpaid',
-            'approval_status' => $approvalStatus,
-            'registration_status' => $registrationStatus,
-            'eligibility_status' => 'passed', 'waitlist_position' => $waitlistPosition,
-            'invoice_amount' => (float) ($category->registration_fee ?? $tournament->registration_fee ?? 0),
-            'invoice_code' => 'TRN-' . date('ymd') . '-' . str_pad((string) random_int(1, 99999), 5, '0', STR_PAD_LEFT),
+            'quick_approve' => $this->request->getPost('quick_approve') === '1',
+            'note' => $this->request->getPost('note'),
         ]);
-        if (! $inserted) {
-            return redirect()->back()->with('error', 'Không thể tạo hồ sơ đăng ký.');
-        }
 
-        return redirect()->back()->with('success', $isFull ? 'Hạng mục đã đủ, hồ sơ được đưa vào danh sách chờ.' : ($approved ? 'Đã thêm và duyệt nhanh vận động viên.' : 'Đã thêm hồ sơ vận động viên vào giải.'));
+        return redirect()->back()->with($result['success'] ? 'success' : 'error', $result['message']);
     }
 
     public function updateRegistration(int $registrationId)

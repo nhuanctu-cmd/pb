@@ -6,6 +6,7 @@ use App\Models\PlayerModel;
 use App\Models\TournamentCategoryModel;
 use App\Models\TournamentModel;
 use App\Models\TournamentRegistrationModel;
+use Config\Database;
 
 class TournamentRegistrationService
 {
@@ -32,6 +33,11 @@ class TournamentRegistrationService
     public function registerTeam(array $data): array
     {
         $data['player_id'] = $data['player_id'] ?? null;
+        return $this->createRegistration($data);
+    }
+
+    public function registerAdmin(array $data): array
+    {
         return $this->createRegistration($data);
     }
 
@@ -136,18 +142,77 @@ class TournamentRegistrationService
             }
         }
 
+        $partnerPlayerId = (int) ($data['partner_player_id'] ?? 0);
+        if ($partnerPlayerId > 0) {
+            $partner = $this->playerModel->where('id', $partnerPlayerId)->where('tenant_id', $tenantId)->where('deleted_at', null)->first();
+            if (! $partner) {
+                return ['success' => false, 'message' => 'VĐV đánh cặp không thuộc tenant hiện tại.'];
+            }
+        }
+
         $playerIds = [];
         if (! empty($data['player_id'])) $playerIds[] = (int) $data['player_id'];
-        if (! empty($data['partner_player_id'])) $playerIds[] = (int) $data['partner_player_id'];
+        if ($partnerPlayerId > 0) $playerIds[] = $partnerPlayerId;
         if (! empty($data['team_id']) && $this->registrationDb()->tableExists('team_members')) {
             foreach ($this->registrationDb()->table('team_members')->select('player_id')->where('team_id', (int) $data['team_id'])->where('tenant_id', $tenantId)->whereIn('status', ['accepted', 'active'])->where('deleted_at', null)->get()->getResult() as $member) $playerIds[] = (int) $member->player_id;
         }
         $playerIds = array_values(array_unique(array_filter($playerIds)));
+
+        if (! $playerIds) {
+            return ['success' => false, 'message' => 'Thiếu thông tin vận động viên.'];
+        }
+
+        if (! empty($data['team_id']) && $data['team_id']) {
+            $teamDuplicate = $this->registrationModel->where('tenant_id', $tenantId)->where('category_id', (int) $data['category_id'])->where('team_id', (int) $data['team_id'])->whereIn('approval_status', ['pending', 'approved'])->where('deleted_at', null)->first();
+            if ($teamDuplicate) {
+                return ['success' => false, 'message' => 'Đội này đã có hồ sơ trong hạng mục này.'];
+            }
+        }
+
+        $duplicateByPlayer = $this->registrationModel
+            ->where('tenant_id', $tenantId)
+            ->where('category_id', (int) $data['category_id'])
+            ->whereIn('player_id', $playerIds)
+            ->whereIn('approval_status', ['pending', 'approved'])
+            ->where('deleted_at', null)
+            ->groupStart()
+                ->whereIn('registration_status', ['pending', 'confirmed'])
+                ->orWhere('registration_status', null)
+            ->groupEnd()
+            ->first();
+        if ($duplicateByPlayer) {
+            return ['success' => false, 'message' => 'Một trong các vận động viên đã có trong hạng mục này.'];
+        }
+
+        if (! empty($data['partner_player_id']) && $this->registrationModel->where('tenant_id', $tenantId)->where('category_id', (int) $data['category_id'])->where('partner_player_id', $partnerPlayerId)->whereIn('approval_status', ['pending', 'approved'])->where('deleted_at', null)->first()) {
+            return ['success' => false, 'message' => 'VĐV đánh cặp đã ở trong bài đăng ký khác trong cùng hạng mục.'];
+        }
+
+        $registrationLimit = (int) ($category->max_teams ?? 0);
+
         $rules = is_string($category->eligibility_rules ?? null) ? (json_decode($category->eligibility_rules, true) ?: []) : (array) ($category->eligibility_rules ?? []);
         $rules = array_merge(['policy' => 'STRICT', 'min_rating' => $category->min_rating, 'max_rating' => $category->max_rating, 'block_unrated' => false], $rules);
         $eligibility = $playerIds ? service('tournamentEligibilityService')->evaluate($tenantId, $playerIds, (string) ($category->discipline ?: 'singles'), $rules) : ['status' => 'flagged', 'eligible' => false, 'reasons' => [['code' => 'PLAYER_ID_REQUIRED']]];
-        if (($eligibility['status'] ?? 'failed') === 'failed' && ! empty($rules['block_unrated'])) return ['success' => false, 'message' => 'Đăng ký không đạt điều kiện rating/skill.', 'eligibility' => $eligibility];
+        if (($eligibility['status'] ?? 'failed') === 'failed' && ! empty($rules['block_unrated'])) {
+            return ['success' => false, 'message' => 'Đăng ký không đạt điều kiện rating/skill.', 'eligibility' => $eligibility];
+        }
         $eligibilityStatus = ! empty($eligibility['eligible']) ? 'passed' : 'flagged';
+        $quickApprove = (bool) ($data['quick_approve'] ?? false);
+        $isFull = $registrationLimit > 0 && $this->registrationModel->countApprovedByCategory((int) $category->id, $tenantId) >= $registrationLimit;
+
+        if ($quickApprove && ! $isFull && $eligibilityStatus === 'passed') {
+            $approvalStatus = 'approved';
+            $registrationStatus = 'confirmed';
+            $waitlistPosition = null;
+        } elseif ($isFull) {
+            $approvalStatus = 'pending';
+            $registrationStatus = 'waitlisted';
+            $waitlistPosition = $this->registrationModel->getNextWaitlistPosition((int) $category->id, $tenantId);
+        } else {
+            $approvalStatus = 'pending';
+            $registrationStatus = 'pending';
+            $waitlistPosition = null;
+        }
 
         $registrationId = $this->registrationModel->insert([
             'tenant_id' => $tournament->tenant_id,
@@ -158,10 +223,11 @@ class TournamentRegistrationService
             'contact_name' => $data['contact_name'],
             'contact_phone' => $data['contact_phone'],
             'payment_status' => $data['payment_status'] ?? 'unpaid',
-            'approval_status' => 'pending',
-            'registration_status' => 'pending',
+            'approval_status' => $approvalStatus,
+            'registration_status' => $registrationStatus,
             'eligibility_status' => $eligibilityStatus,
-            'partner_player_id' => $data['partner_player_id'] ?? null,
+            'partner_player_id' => $partnerPlayerId ?: null,
+            'waitlist_position' => $waitlistPosition,
             'note' => $data['note'] ?? null,
         ]);
 
@@ -173,7 +239,12 @@ class TournamentRegistrationService
 
         return [
             'success' => true,
-            'message' => $eligibilityStatus === 'passed' ? 'Đăng ký đã được gửi.' : 'Đăng ký đã được gửi và cần ban tổ chức review eligibility.',
+            'message' => match (true) {
+                $isFull => 'Số lượng hạng mục đã kín, hồ sơ được đưa vào danh sách chờ.',
+                $quickApprove && $eligibilityStatus === 'passed' => 'Đã thêm và duyệt nhanh vận động viên.',
+                $eligibilityStatus === 'passed' => 'Đăng ký đã được gửi.',
+                default => 'Đăng ký đã được gửi và cần ban tổ chức review eligibility.',
+            },
             'registration' => $this->registrationModel->find($registrationId),
             'invoice' => $invoice,
             'eligibility' => $eligibility,
@@ -182,7 +253,7 @@ class TournamentRegistrationService
 
     private function registrationDb()
     {
-        return ConfigDatabase::connect();
+        return Database::connect();
     }
 
     private function findOrCreatePlayer(array $data): int

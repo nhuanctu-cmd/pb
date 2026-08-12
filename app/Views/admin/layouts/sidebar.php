@@ -28,8 +28,33 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link <?= is_active_route('admin/front-desk') ?>" href="/admin/front-desk">
+                    <i class="bi bi-person-workspace"></i> Front Desk
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link <?= is_active_route('admin/daily-closing') ?>" href="/admin/daily-closing">
+                    <i class="bi bi-cash-stack"></i> Daily Closing
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link <?= is_active_route('admin/owner-dashboard') ?>" href="/admin/owner-dashboard">
                     <i class="bi bi-briefcase"></i> Owner Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link <?= is_active_route('admin/memberships/renewals') ?>" href="/admin/memberships/renewals">
+                    <i class="bi bi-arrow-repeat"></i> Gia hạn hội viên
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link <?= is_active_route('admin/crm-campaigns') ?>" href="/admin/crm-campaigns">
+                    <i class="bi bi-megaphone-fill"></i> CRM Campaign
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link <?= is_active_route('admin/runbook') ?>" href="/admin/runbook">
+                    <i class="bi bi-journal-check"></i> Runbook vận hành
                 </a>
             </li>
             <li class="nav-item">

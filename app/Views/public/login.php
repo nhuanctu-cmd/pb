@@ -65,6 +65,11 @@
             font-size: 0.78rem;
             color: #667eea;
         }
+        .demo-actions .btn {
+            border-radius: 999px;
+            font-size: 0.72rem;
+            padding: 0.15rem 0.62rem;
+        }
     </style>
 </head>
 <body>
@@ -103,7 +108,7 @@
                                 </div>
                             <?php endif; ?>
 
-                            <form action="/login" method="POST">
+                            <form id="loginForm" action="/login" method="POST">
                                 <div class="mb-3">
                                     <label class="form-label"><?= lang('Auth.email') ?></label>
                                     <input type="email" name="email" class="form-control form-control-lg" placeholder="email@example.com" required>
@@ -143,6 +148,14 @@
                                          data-email="<?= esc($acc['email']) ?>" data-password="<?= esc($acc['password']) ?>">
                                         <span class="fw-semibold"><?= esc($acc['role']) ?></span>
                                         <code><?= esc($acc['email']) ?></code>
+                                        <div class="demo-actions">
+                                            <button type="button" class="btn btn-outline-primary btn-sm me-1" data-action="fill" data-email="<?= esc($acc['email']) ?>" data-password="<?= esc($acc['password']) ?>">
+                                                Điền nhanh
+                                            </button>
+                                            <button type="button" class="btn btn-primary btn-sm" data-action="login" data-email="<?= esc($acc['email']) ?>" data-password="<?= esc($acc['password']) ?>">
+                                                Đăng nhập ngay
+                                            </button>
+                                        </div>
                                     </div>
                                 <?php endforeach; ?>
                             </div>
@@ -155,11 +168,41 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        const $email = document.querySelector('input[name="email"]');
+        const $password = document.querySelector('input[name="password"]');
+        const $form = document.getElementById('loginForm');
+
+        const fillDemo = function (email, password) {
+            $email.value = email;
+            $password.value = password;
+            $password.focus();
+        };
+
+        const submitLogin = function (email, password) {
+            fillDemo(email, password);
+            $form.submit();
+        };
+
         document.querySelectorAll('.demo-account-item').forEach(function (item) {
-            item.addEventListener('click', function () {
-                document.querySelector('input[name="email"]').value = this.dataset.email;
-                document.querySelector('input[name="password"]').value = this.dataset.password;
-                document.querySelector('input[name="password"]').focus();
+            item.addEventListener('click', function (event) {
+                if (event.target.closest('.demo-actions')) {
+                    return;
+                }
+                fillDemo(this.dataset.email, this.dataset.password);
+            });
+        });
+
+        document.querySelectorAll('[data-action="fill"]').forEach(function (button) {
+            button.addEventListener('click', function (event) {
+                event.stopPropagation();
+                fillDemo(this.dataset.email, this.dataset.password);
+            });
+        });
+
+        document.querySelectorAll('[data-action="login"]').forEach(function (button) {
+            button.addEventListener('click', function (event) {
+                event.stopPropagation();
+                submitLogin(this.dataset.email, this.dataset.password);
             });
         });
     </script>

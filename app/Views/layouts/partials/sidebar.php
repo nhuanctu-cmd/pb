@@ -22,6 +22,7 @@ $playerRouteId = 0;
 $clubRouteId = 0;
 $membershipRouteId = 0;
 $matchRouteId = 0;
+$today = date('Y-m-d');
 
 if (preg_match('#admin/facilities/(?:dashboard|edit|update|delete|branches|clubs)/(\d+)#', $currentPath, $m)) {
     $facilityRouteId = (int) $m[1];
@@ -130,8 +131,45 @@ $allMenu = [
         ['label' => lang('App.menu_recurring_bookings'), 'icon' => 'bi-arrow-repeat', 'url' => '/admin/recurring-bookings', 'active' => 'admin/recurring-bookings', 'perm' => 'bookings.view'],
         ['label' => lang('App.menu_waitlist'), 'icon' => 'bi-hourglass-split', 'url' => '/admin/waitlist', 'active' => 'admin/waitlist', 'perm' => 'bookings.view'],
         ['label' => lang('App.menu_walk_ins'), 'icon' => 'bi-person-walking', 'url' => '/admin/walk-ins', 'active' => 'admin/walk-ins', 'perm' => 'bookings.view'],
-        ['label' => 'Front Desk · Quầy vận hành', 'icon' => 'bi-person-workspace', 'url' => '/admin/front-desk', 'active' => 'admin/front-desk', 'perm' => 'bookings.view'],
-        ['label' => 'Daily Closing · Chốt ca', 'icon' => 'bi-cash-stack', 'url' => '/admin/daily-closing', 'active' => 'admin/daily-closing', 'perm' => 'payments.view'],
+        [
+            'label' => 'Front Desk · Quầy vận hành',
+            'icon'  => 'bi-person-workspace',
+            'url'   => '/admin/front-desk',
+            'active'=> 'admin/front-desk',
+            'perm'  => 'bookings.view',
+            'children' => [
+                ['label' => 'Tổng quan quầy', 'icon' => 'bi-speedometer2', 'url' => '/admin/front-desk', 'active' => 'admin/front-desk', 'perm' => 'bookings.view'],
+                ['label' => 'Đơn đang chờ check-in', 'icon' => 'bi-hourglass-top', 'url' => '/admin/front-desk?date=' . $today . '&status=reserved', 'active' => 'admin/front-desk', 'perm' => 'bookings.view'],
+                ['label' => 'Đang chơi / đã vào sân', 'icon' => 'bi-play-fill', 'url' => '/admin/front-desk?date=' . $today . '&status=in_progress', 'active' => 'admin/front-desk', 'perm' => 'bookings.view'],
+                ['label' => 'Hàng hold chờ kích hoạt', 'icon' => 'bi-pause-circle', 'url' => '/admin/front-desk?date=' . $today . '&status=hold', 'active' => 'admin/front-desk', 'perm' => 'bookings.view'],
+                ['label' => 'Lịch sử quầy hôm nay', 'icon' => 'bi-clock-history', 'url' => '/admin/front-desk?date=' . $today, 'active' => 'admin/front-desk', 'perm' => 'bookings.view'],
+            ],
+        ],
+        [
+            'label' => 'Owner Dashboard',
+            'icon'  => 'bi-briefcase',
+            'url'   => '/admin/owner-dashboard',
+            'active'=> 'admin/owner-dashboard',
+            'perm'  => 'dashboard.view',
+            'children' => [
+                ['label' => 'KPI MTD/YTD', 'icon' => 'bi-graph-up', 'url' => '/admin/owner-dashboard?date=' . $today, 'active' => 'admin/owner-dashboard', 'perm' => 'dashboard.view'],
+                ['label' => 'Cảnh báo gia hạn', 'icon' => 'bi-bell-fill', 'url' => '/admin/owner-dashboard?date=' . $today . '&scope=alerts', 'active' => 'admin/owner-dashboard', 'perm' => 'dashboard.view'],
+                ['label' => 'Top khách & công nợ', 'icon' => 'bi-currency-exchange', 'url' => '/admin/owner-dashboard?date=' . $today, 'active' => 'admin/owner-dashboard', 'perm' => 'dashboard.view'],
+            ],
+        ],
+        [
+            'label' => 'Daily Closing · Chốt ca',
+            'icon'  => 'bi-cash-stack',
+            'url'   => '/admin/daily-closing',
+            'active'=> 'admin/daily-closing',
+            'perm'  => 'payments.view',
+            'children' => [
+                ['label' => 'Chốt ca hôm nay', 'icon' => 'bi-cash-stack', 'url' => '/admin/daily-closing?date=' . $today, 'active' => 'admin/daily-closing', 'perm' => 'payments.view'],
+                ['label' => 'In HTML', 'icon' => 'bi-printer', 'url' => '/admin/daily-closing/print?date=' . $today, 'active' => 'admin/daily-closing/print', 'perm' => 'payments.view'],
+                ['label' => 'In PDF', 'icon' => 'bi-file-earmark-pdf', 'url' => '/admin/daily-closing/pdf?date=' . $today, 'active' => 'admin/daily-closing/pdf', 'perm' => 'payments.view'],
+                ['label' => 'Xuất CSV', 'icon' => 'bi-filetype-csv', 'url' => '/admin/daily-closing/csv?date=' . $today, 'active' => 'admin/daily-closing/csv', 'perm' => 'payments.view'],
+            ],
+        ],
         ['label' => lang('App.menu_operations_report'), 'icon' => 'bi-bar-chart-line', 'url' => '/admin/operations-report', 'active' => 'admin/operations-report', 'perm' => 'dashboard.view'],
 
         [
@@ -215,6 +253,21 @@ $allMenu = [
 
         ['label' => lang('App.menu_growth'), 'icon' => 'bi-megaphone', 'url' => '/admin/growth', 'active' => 'admin/growth', 'perm' => 'players.view'],
         ['label' => 'CRM Campaign', 'icon' => 'bi-megaphone-fill', 'url' => '/admin/crm-campaigns', 'active' => 'admin/crm-campaigns', 'perm' => 'players.view'],
+        [
+            'label' => 'Runbook vận hành thương mại',
+            'icon'  => 'bi-journal-check',
+            'url'   => '/admin/runbook',
+            'active'=> 'admin/runbook',
+            'perm'  => 'dashboard.view',
+            'children' => [
+                ['label' => 'Runbook trực quan', 'icon' => 'bi-rocket-takeoff', 'url' => '/admin/runbook', 'active' => 'admin/runbook', 'perm' => 'dashboard.view'],
+                ['label' => 'Front Desk', 'icon' => 'bi-person-workspace', 'url' => '/admin/front-desk?date=' . $today, 'active' => 'admin/front-desk', 'perm' => 'bookings.view'],
+                ['label' => 'Owner Dashboard', 'icon' => 'bi-briefcase', 'url' => '/admin/owner-dashboard?date=' . $today, 'active' => 'admin/owner-dashboard', 'perm' => 'dashboard.view'],
+                ['label' => 'Daily Closing', 'icon' => 'bi-cash-stack', 'url' => '/admin/daily-closing?date=' . $today, 'active' => 'admin/daily-closing', 'perm' => 'payments.view'],
+                ['label' => 'Gia hạn hội viên', 'icon' => 'bi-arrow-repeat', 'url' => '/admin/memberships/renewals?days=30&status=active', 'active' => 'admin/memberships/renewals', 'perm' => 'memberships.view'],
+                ['label' => 'CRM Campaign', 'icon' => 'bi-megaphone-fill', 'url' => '/admin/crm-campaigns', 'active' => 'admin/crm-campaigns', 'perm' => 'players.view'],
+            ],
+        ],
 
         [
             'label' => lang('App.menu_pricing_rules'),

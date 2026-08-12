@@ -217,6 +217,7 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
         $routes->post('rating/imports/(:num)/reject', 'RatingGovernanceController::rejectImport/$1', ['filter' => 'permission:rating.review']);
         $routes->get('dashboard', 'DashboardController::index');
         $routes->get('owner-dashboard', 'OwnerDashboardController::index');
+        $routes->get('runbook', 'RunbookController::index', ['filter' => 'permission:dashboard.view']);
 
         $routes->group('ops', ['filter' => 'permission:bookings.view'], function ($routes) {
             $routes->get('available-courts', 'OpsAjaxController::availableCourts');

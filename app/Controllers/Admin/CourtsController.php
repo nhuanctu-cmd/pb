@@ -9,6 +9,7 @@ use App\Models\CourtModel;
 use App\Models\CourtTypeModel;
 use App\Models\CourtImageModel;
 use App\Models\CourtMaintenanceModel;
+use App\Models\ClubModel;
 
 class CourtsController extends BaseController
 {
@@ -18,6 +19,7 @@ class CourtsController extends BaseController
     protected CourtTypeModel $courtTypeModel;
     protected CourtImageModel $courtImageModel;
     protected CourtMaintenanceModel $maintenanceModel;
+    protected ClubModel $clubModel;
 
     public function __construct()
     {
@@ -27,6 +29,7 @@ class CourtsController extends BaseController
         $this->courtTypeModel = new CourtTypeModel();
         $this->courtImageModel = new CourtImageModel();
         $this->maintenanceModel = new CourtMaintenanceModel();
+        $this->clubModel = new ClubModel();
     }
 
     public function index()
@@ -40,6 +43,7 @@ class CourtsController extends BaseController
 
         $this->viewData['branches'] = $branches;
         $this->viewData['courtTypes'] = $this->courtService->getActiveCourtTypes($tenantId);
+        $this->viewData['clubs'] = $this->clubModel->getByTenant((int) $tenantId, ['status' => 'active']);
         $requestedBranch = $branchId ? $this->branchModel->findForTenant((int) $branchId, (int) $tenantId) : null;
         $this->viewData['currentBranchId'] = $requestedBranch?->id ?? ($branches[0]->id ?? null);
         $this->viewData['filters'] = $filters;
@@ -62,6 +66,7 @@ class CourtsController extends BaseController
         $this->viewData['pageTitle'] = lang('Court.create');
         $this->viewData['branches'] = $this->branchModel->getByTenant($tenantId);
         $this->viewData['courtTypes'] = $this->courtService->getActiveCourtTypes($tenantId);
+        $this->viewData['clubs'] = $this->clubModel->getByTenant((int) $tenantId, ['status' => 'active']);
 
         return $this->render('admin/courts/form', $this->viewData);
     }
@@ -88,6 +93,11 @@ class CourtsController extends BaseController
             return redirect()->back()->withInput()->with('error', lang('App.forbidden'));
         }
 
+        $clubId = (int) $this->request->getPost('club_id');
+        if ($clubId && ! $this->clubModel->findForTenant($clubId, (int) $tenantId)) {
+            return redirect()->back()->withInput()->with('error', 'CLB không thuộc tenant hiện tại.');
+        }
+
         $rules = [
             'branch_id'     => 'required|integer',
             'court_type_id' => 'required|integer',
@@ -111,6 +121,7 @@ class CourtsController extends BaseController
 
         $data = [
             'tenant_id'     => $tenantId,
+            'club_id'       => $clubId ?: null,
             'branch_id'     => (int) $this->request->getPost('branch_id'),
             'court_type_id' => (int) $this->request->getPost('court_type_id'),
             'code'          => $code,
@@ -148,6 +159,7 @@ class CourtsController extends BaseController
         $this->viewData['court'] = $court;
         $this->viewData['branches'] = $this->branchModel->getByTenant($tenantId);
         $this->viewData['courtTypes'] = $this->courtService->getActiveCourtTypes($tenantId);
+        $this->viewData['clubs'] = $this->clubModel->getByTenant((int) $tenantId, ['status' => 'active']);
         $this->viewData['courtImages'] = $this->courtService->getCourtImages($id);
         $this->viewData['maintenanceRecords'] = $this->courtService->getMaintenanceByCourt($id);
 
@@ -167,6 +179,11 @@ class CourtsController extends BaseController
             || !$this->courtTypeModel->where('id', (int) $this->request->getPost('court_type_id'))
                 ->where('tenant_id', $tenantId)->where('deleted_at', null)->first()) {
             return redirect()->back()->withInput()->with('error', lang('App.forbidden'));
+        }
+
+        $clubId = (int) $this->request->getPost('club_id');
+        if ($clubId && ! $this->clubModel->findForTenant($clubId, $tenantId)) {
+            return redirect()->back()->withInput()->with('error', 'CLB không thuộc tenant hiện tại.');
         }
 
         $rules = [
@@ -192,6 +209,7 @@ class CourtsController extends BaseController
 
         $data = [
             'branch_id'     => (int) $this->request->getPost('branch_id'),
+            'club_id'       => $clubId ?: null,
             'court_type_id' => (int) $this->request->getPost('court_type_id'),
             'code'          => $code,
             'name_vi'       => $this->request->getPost('name_vi'),

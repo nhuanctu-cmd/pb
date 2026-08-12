@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="<?= esc(session('locale') ?? 'vi') ?>">
+<?php $currentLocale = service('language')->getLocale(); ?>
+<html lang="<?= esc($currentLocale) ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,17 +16,19 @@
         <button class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#playerNav"><span class="navbar-toggler-icon"></span></button>
         <div id="playerNav" class="collapse navbar-collapse">
             <div class="navbar-nav ms-auto">
-                <a class="nav-link fw-semibold text-success" href="/player/bookings/create"><i class="bi bi-plus-circle"></i> Đặt sân</a>
-                <a class="nav-link" href="/player/bookings"><i class="bi bi-calendar-check"></i> Booking</a>
-                <a class="nav-link" href="/player/teams"><i class="bi bi-people"></i> Team</a>
-                <a class="nav-link" href="/player/matches"><i class="bi bi-controller"></i> Tìm kèo</a>
-                <a class="nav-link" href="/player/open-play"><i class="bi bi-people"></i> Open Play</a>
-                <a class="nav-link" href="/player/coaching"><i class="bi bi-person-video3"></i> Coach</a>
-                <a class="nav-link" href="/player/competitions"><i class="bi bi-trophy"></i> League</a>
-                <a class="nav-link" href="/player/growth"><i class="bi bi-megaphone"></i> Ưu đãi</a>
-                <a class="nav-link" href="/player/social"><i class="bi bi-heart"></i> Theo dõi</a>
-                <a class="nav-link" href="/player/community"><i class="bi bi-chat-square-text"></i> Cộng đồng</a>
-                <a class="nav-link" href="/player/profile"><i class="bi bi-person"></i> Hồ sơ</a>
+                <a class="nav-link fw-semibold text-success" href="/player/bookings/create"><i class="bi bi-plus-circle"></i> <?= esc(lang('App.player_book_court')) ?></a>
+                <a class="nav-link" href="/player/bookings"><i class="bi bi-calendar-check"></i> <?= esc(lang('App.player_booking')) ?></a>
+                <a class="nav-link" href="/player/teams"><i class="bi bi-people"></i> <?= esc(lang('App.player_team')) ?></a>
+                <a class="nav-link" href="/player/matches"><i class="bi bi-controller"></i> <?= esc(lang('App.player_find_match')) ?></a>
+                <a class="nav-link" href="/player/open-play"><i class="bi bi-people"></i> <?= esc(lang('App.player_open_play')) ?></a>
+                <a class="nav-link" href="/player/coaching"><i class="bi bi-person-video3"></i> <?= esc(lang('App.player_coach')) ?></a>
+                <a class="nav-link" href="/player/competitions"><i class="bi bi-trophy"></i> <?= esc(lang('App.player_league')) ?></a>
+                <a class="nav-link" href="/player/growth"><i class="bi bi-megaphone"></i> <?= esc(lang('App.player_offers')) ?></a>
+                <a class="nav-link" href="/player/social"><i class="bi bi-heart"></i> <?= esc(lang('App.player_following')) ?></a>
+                <a class="nav-link" href="/player/community"><i class="bi bi-chat-square-text"></i> <?= esc(lang('App.player_community')) ?></a>
+                <a class="nav-link" href="/player/livestream"><i class="bi bi-broadcast-pin"></i> <?= esc(lang('App.player_livestream')) ?></a>
+                <a class="nav-link" href="/player/profile"><i class="bi bi-person"></i> <?= esc(lang('App.player_profile')) ?></a>
+                <a class="nav-link" href="<?= esc(site_url('locale/switch/' . ($currentLocale === 'vi' ? 'en' : 'vi'))) ?>"><i class="bi bi-translate"></i> <?= $currentLocale === 'vi' ? 'EN' : 'VI' ?></a>
             </div>
         </div>
     </div>

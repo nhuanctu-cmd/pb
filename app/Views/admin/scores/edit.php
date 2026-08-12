@@ -18,6 +18,7 @@ $teamB = $match->team_b_name ?? ('Team #' . ($match->team_b_id ?? '-'));
         <?= csrf_field() ?>
         <button class="erp-btn erp-btn-primary" type="submit"><i class="bi bi-play-fill"></i> Bắt đầu trận</button>
     </form>
+    <?php if (($match->status ?? '') === 'completed' && empty($match->is_locked)): ?><form method="post" action="<?= esc($postBase ?? '/admin/scores') ?>/<?= (int) $match->id ?>/lock" class="d-inline"><?= csrf_field() ?><button class="erp-btn" type="submit"><i class="bi bi-lock"></i> Khóa kết quả</button></form><?php elseif (! empty($match->is_locked)): ?><form method="post" action="<?= esc($postBase ?? '/admin/scores') ?>/<?= (int) $match->id ?>/unlock" class="d-inline"><?= csrf_field() ?><button class="erp-btn" type="submit"><i class="bi bi-unlock"></i> Mở khóa</button></form><?php endif; ?>
 </div>
 
 <div class="row g-3">

@@ -73,6 +73,21 @@ class MembershipsController extends BaseController
         return redirect()->back()->with('error', lang('App.error'));
     }
 
+    public function renewals()
+    {
+        $days = max(1, min(365, (int) ($this->request->getGet('days') ?: 30)));
+        $this->viewData['pageTitle'] = 'Gia hạn hội viên';
+        $this->viewData['days'] = $days;
+        $this->viewData['renewals'] = $this->membershipService->getRenewalCandidates((int) current_tenant_id(), $days);
+        return $this->render('admin/memberships/renewals', $this->viewData);
+    }
+
+    public function renew(int $id)
+    {
+        $newId = $this->membershipService->renew($id, (int) current_tenant_id());
+        return redirect()->to('/admin/memberships/renewals')->with($newId ? 'success' : 'error', $newId ? 'Đã gia hạn hội viên.' : 'Không thể gia hạn hội viên.');
+    }
+
     public function packages()
     {
         $tenantId = current_tenant_id();

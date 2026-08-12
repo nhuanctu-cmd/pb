@@ -95,6 +95,11 @@ class PlayerService
 
     public function updateRating(int $playerId, float $ratingScore): bool
     {
+        $db = \Config\Database::connect();
+        if ($db->tableExists('player_rating_profiles') && $db->tableExists('rating_transactions')) {
+            // Canonical rating is ledger-owned; direct legacy writes are intentionally blocked.
+            return false;
+        }
         return $this->playerModel->update($playerId, ['rating_score' => $ratingScore]);
     }
 

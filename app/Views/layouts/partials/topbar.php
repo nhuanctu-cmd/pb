@@ -20,6 +20,10 @@
         <div class="dropdown">
             <button class="erp-btn dropdown-toggle" data-bs-toggle="dropdown">
                 <span class="erp-avatar"><?= esc(substr(session('fullName') ?? 'AD', 0, 1)) ?></span>
+                <span class="d-none d-xl-inline text-start ms-1">
+                    <strong class="d-block small"><?= esc(session('fullName') ?? 'Tài khoản') ?></strong>
+                    <small class="text-muted"><?= esc(session('primary_role') ?? 'staff') ?></small>
+                </span>
             </button>
             <div class="dropdown-menu dropdown-menu-end">
                 <a class="dropdown-item" href="/admin/profile">Hồ sơ</a>

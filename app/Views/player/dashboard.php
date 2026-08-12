@@ -59,7 +59,7 @@
                     <div style="font-size:11px;color:#666"><?= date('M', strtotime($b['start_time'])) ?></div>
                 </div>
                 <div style="flex:1">
-                    <div style="font-weight:600;font-size:14px">Sân <?= $b['court_name'] ?? '#' . $b['court_id'] ?></div>
+                    <div style="font-weight:600;font-size:14px">Sân <?= esc($b['court_name'] ?? ($b['court_id'] ?? 'chưa gán')) ?></div>
                     <div style="font-size:12px;color:#666">
                         <?= date('H:i', strtotime($b['start_time'])) ?> - <?= date('H:i', strtotime($b['end_time'])) ?>
                     </div>

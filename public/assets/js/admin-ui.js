@@ -1,6 +1,14 @@
 (function () {
   function qs(selector, root) { return (root || document).querySelector(selector); }
   function qsa(selector, root) { return Array.prototype.slice.call((root || document).querySelectorAll(selector)); }
+  function positionSubmenu(menuParent, submenu) {
+    if (!menuParent || !submenu || window.innerWidth < 992) return;
+    var parentRect = menuParent.getBoundingClientRect();
+    var sidebar = qs('.erp-sidebar');
+    var sidebarRect = sidebar ? sidebar.getBoundingClientRect() : null;
+    submenu.style.left = (sidebarRect ? sidebarRect.right : parentRect.right) + 'px';
+    submenu.style.top = Math.max(8, parentRect.top) + 'px';
+  }
   function openConfirm(message, onConfirm) {
     var existing = qs('.erp-confirm-backdrop');
     if (existing) existing.remove();
@@ -30,6 +38,24 @@
   }
 
   document.addEventListener('click', function (event) {
+    var menuParent = event.target.closest('.erp-menu-parent');
+    if (menuParent) {
+      var menuItem = menuParent.closest('.erp-menu-item');
+      var submenu = menuItem && menuItem.querySelector('.erp-submenu');
+      if (submenu) {
+        event.preventDefault();
+        positionSubmenu(menuParent, submenu);
+        qsa('.erp-menu-item > .erp-submenu.is-open').forEach(function (item) {
+          if (item !== submenu) {
+            item.classList.remove('is-open');
+            item.style.display = '';
+          }
+        });
+        submenu.classList.add('is-open');
+        submenu.style.display = 'block';
+      }
+    }
+
     var sidebarToggle = event.target.closest('[data-sidebar-toggle]');
     if (sidebarToggle) {
       document.body.classList.toggle('erp-sidebar-collapsed');
@@ -118,9 +144,30 @@
     }
   });
 
+  qsa('.erp-menu-item').forEach(function (menuItem) {
+    var menuParent = menuItem.querySelector('.erp-menu-parent');
+    var submenu = menuItem.querySelector('.erp-submenu');
+    if (!menuParent || !submenu) return;
+    menuItem.addEventListener('mouseenter', function () {
+      qsa('.erp-menu-item > .erp-submenu.is-open').forEach(function (item) {
+        if (item !== submenu) {
+          item.classList.remove('is-open');
+          item.style.display = '';
+        }
+      });
+      positionSubmenu(menuParent, submenu);
+      submenu.classList.add('is-open');
+      submenu.style.display = 'block';
+    });
+  });
+
   if (localStorage.getItem('erp-sidebar-collapsed') === '1') {
     document.body.classList.add('erp-sidebar-collapsed');
   }
+
+  qsa('.erp-menu-item > .erp-submenu.is-open').forEach(function (submenu) {
+    positionSubmenu(submenu.parentElement.querySelector('.erp-menu-parent'), submenu);
+  });
 
   qsa('[data-toast]').forEach(function (node) {
     window.erpToast(node.getAttribute('data-toast'), node.getAttribute('data-toast-type') || 'info');

@@ -1,0 +1,12 @@
+# Laragon/Apache entrypoint: serve CodeIgniter from /public without requiring
+# a manual PHP server command. Existing public assets remain direct files.
+Options -Indexes
+RewriteEngine On
+
+# Static files are kept in public/, but remain addressable from the Laragon
+# project root or an auto-created .test virtual host.
+RewriteRule ^(assets|uploads)(/.*)?$ public/$1$2 [L,NC]
+RewriteRule ^(favicon\.ico|robots\.txt)$ public/$1 [L,NC]
+
+RewriteCond %{REQUEST_URI} !^/public/ [NC]
+RewriteRule ^(.*)$ public/index.php/$1 [L,QSA]

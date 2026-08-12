@@ -24,10 +24,10 @@
                 <?= session('fullName') ?? session('username') ?? 'User' ?>
             </button>
             <ul class="dropdown-menu dropdown-menu-end">
-                <li><a class="dropdown-item" href="/admin/profile"><i class="bi bi-person"></i> Profile</a></li>
-                <li><a class="dropdown-item" href="/admin/settings"><i class="bi bi-gear"></i> Settings</a></li>
+                <li><a class="dropdown-item" href="/admin/profile"><i class="bi bi-person"></i> <?= esc(lang('App.account_profile')) ?></a></li>
+                <li><a class="dropdown-item" href="/admin/settings"><i class="bi bi-gear"></i> <?= esc(lang('App.account_settings')) ?></a></li>
                 <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item text-danger" href="/logout"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+                <li><a class="dropdown-item text-danger" href="/logout"><i class="bi bi-box-arrow-right"></i> <?= esc(lang('App.logout')) ?></a></li>
             </ul>
         </div>
     </div>

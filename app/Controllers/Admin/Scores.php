@@ -71,6 +71,24 @@ class Scores extends BaseController
         return redirect()->back()->with($result['success'] ? 'success' : 'error', $result['message']);
     }
 
+    public function lock(int $matchId)
+    {
+        $match = $this->scoreService->getMatch($matchId, (int) current_tenant_id());
+        if (! $match) return redirect()->back()->with('error', 'Không tìm thấy trận đấu.');
+        if (($match->status ?? '') !== 'completed') return redirect()->back()->with('error', 'Chỉ được khóa trận đã hoàn tất.');
+        $ok = (new \App\Services\TournamentSchedulerService())->lockMatch($matchId);
+        return redirect()->back()->with($ok ? 'success' : 'error', $ok ? 'Đã khóa kết quả trận.' : 'Không thể khóa kết quả.');
+    }
+
+    public function unlock(int $matchId)
+    {
+        if (! is_superadmin() && ! has_role('admin')) return redirect()->back()->with('error', 'Bạn không có quyền mở khóa kết quả.');
+        $match = $this->scoreService->getMatch($matchId, (int) current_tenant_id());
+        if (! $match) return redirect()->back()->with('error', 'Không tìm thấy trận đấu.');
+        $ok = (new \App\Services\TournamentSchedulerService())->unlockMatch($matchId);
+        return redirect()->back()->with($ok ? 'success' : 'error', $ok ? 'Đã mở khóa kết quả trận.' : 'Không thể mở khóa kết quả.');
+    }
+
     protected function matches(): array
     {
         $db = \Config\Database::connect();

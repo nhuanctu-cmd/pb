@@ -27,13 +27,22 @@ class LiveScoreService
             $builder->where('m.tournament_id', $tournamentId);
         }
         if ($this->fieldExists('tournament_matches', 'status')) {
-            $builder->whereIn('m.status', ['scheduled', 'pending', 'running', 'in_progress', 'completed']);
+            $builder->whereIn('m.status', ['scheduled', 'pending', 'called', 'on_court', 'running', 'in_progress', 'delayed', 'completed', 'walkover']);
         }
 
-        $matches = $builder->orderBy('m.id', 'ASC')->limit(100)->get()->getResult();
+        if ($this->db->tableExists('teams')) {
+            $builder->select('m.*, ta.team_name AS team_a_name, tb.team_name AS team_b_name, co.name_vi AS court_name, c.name_vi AS category_name')
+                ->join('teams ta', 'ta.id = m.team_a_id AND ta.tenant_id = m.tenant_id', 'left')
+                ->join('teams tb', 'tb.id = m.team_b_id AND tb.tenant_id = m.tenant_id', 'left')
+                ->join('courts co', 'co.id = m.court_id AND co.tenant_id = m.tenant_id', 'left')
+                ->join('tournament_categories c', 'c.id = m.category_id AND c.tenant_id = m.tenant_id', 'left');
+        }
+        $matches = $builder->orderBy('m.scheduled_date', 'ASC')->orderBy('m.start_time', 'ASC')->orderBy('m.id', 'ASC')->limit(100)->get()->getResult();
         foreach ($matches as $match) {
             $match->scores = $this->getScores((int) $match->id, $tenantId);
             $match->score_text = $this->formatScore($match->scores);
+            $match->team_a_label = $match->team_a_name ?: ($match->team_a_id ? 'Team #' . $match->team_a_id : 'BYE');
+            $match->team_b_label = $match->team_b_name ?: ($match->team_b_id ? 'Team #' . $match->team_b_id : 'BYE');
         }
 
         return $matches;
@@ -42,8 +51,14 @@ class LiveScoreService
     public function getTvDisplayData(?int $tenantId = null, ?int $tournamentId = null): array
     {
         $matches = $this->getLiveMatches($tenantId, $tournamentId);
-        $live = array_values(array_filter($matches, static fn ($m) => in_array(($m->status ?? ''), ['running', 'in_progress'], true)));
-        $next = array_values(array_filter($matches, static fn ($m) => in_array(($m->status ?? 'scheduled'), ['scheduled', 'pending'], true)));
+        $live = array_values(array_filter($matches, static fn ($m) => in_array(($m->status ?? ''), ['on_court', 'running', 'in_progress'], true)));
+        $called = array_values(array_filter($matches, static fn ($m) => ($m->status ?? '') === 'called'));
+        $next = array_values(array_filter($matches, static fn ($m) => in_array(($m->status ?? 'scheduled'), ['scheduled', 'pending', 'delayed'], true)));
+        $results = array_values(array_filter($matches, static fn ($m) => in_array(($m->status ?? ''), ['completed', 'walkover'], true)));
+        $tournament = null;
+        if ($tournamentId && $this->db->tableExists('tournaments')) {
+            $tournament = $this->db->table('tournaments')->where('id', $tournamentId)->where('tenant_id', $tenantId)->where('deleted_at', null)->get()->getRow();
+        }
 
         $config = null;
         if ($this->db->tableExists('live_display_configs')) {
@@ -59,8 +74,17 @@ class LiveScoreService
 
         return [
             'config' => $config,
+            'tournament' => $tournament,
             'live_matches' => $live,
+            'called_matches' => $called,
             'next_matches' => $next,
+            'result_matches' => array_slice(array_reverse($results), 0, 6),
+            'slides' => array_values(array_filter([
+                ! empty($live) ? 'live' : null,
+                ! empty($called) ? 'call' : null,
+                ! empty($next) ? 'next' : null,
+                ! empty($results) ? 'results' : null,
+            ])),
             'refresh_seconds' => (int) ($config->refresh_seconds ?? 5),
             'show_sponsor' => (bool) ($config->show_sponsor ?? true),
             'show_next_matches' => (bool) ($config->show_next_matches ?? true),

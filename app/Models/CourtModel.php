@@ -13,13 +13,10 @@ class CourtModel extends Model
     protected $useSoftDeletes   = true;
     protected $protectFields    = true;
     protected $allowedFields    = [
-        'tenant_id', 'facility_id', 'branch_id', 'court_type_id', 'status_id',
-        'code', 'name_vi', 'name_en', 'display_name', 'floor', 'area',
-        'is_indoor', 'surface_type', 'length', 'width', 'ceiling_height',
-        'player_capacity', 'spectator_capacity', 'color_scheme',
+        'tenant_id', 'facility_id', 'club_id', 'branch_id', 'court_type_id',
+        'code', 'name_vi', 'name_en', 'floor', 'area', 'is_indoor',
         'has_light', 'has_fan', 'has_camera', 'status', 'sort_order',
-        'coordinates_x', 'coordinates_y', 'rotation', 'amenities',
-        'pricing_rules', 'last_active_at', 'created_by', 'updated_by',
+        'created_by', 'updated_by',
     ];
 
     protected bool $allowEmptyInserts = false;
@@ -72,10 +69,15 @@ class CourtModel extends Model
         $builder = $this->where('courts.branch_id', $branchId)
                         ->where('courts.deleted_at', null)
                         ->join('court_types', 'court_types.id = courts.court_type_id', 'left')
-                        ->select('courts.*, court_types.name_vi as court_type_name_vi, court_types.name_en as court_type_name_en');
+                        ->join('clubs', 'clubs.id = courts.club_id AND clubs.tenant_id = courts.tenant_id AND clubs.deleted_at IS NULL', 'left')
+                        ->select('courts.*, court_types.name_vi as court_type_name_vi, court_types.name_en as court_type_name_en, clubs.name_vi as club_name_vi, clubs.name_en as club_name_en, clubs.logo as club_logo');
 
         if (!empty($filters['court_type_id'])) {
             $builder->where('courts.court_type_id', $filters['court_type_id']);
+        }
+
+        if (array_key_exists('club_id', $filters) && $filters['club_id'] !== '' && $filters['club_id'] !== null) {
+            $builder->where('courts.club_id', (int) $filters['club_id']);
         }
 
         if (!empty($filters['status'])) {

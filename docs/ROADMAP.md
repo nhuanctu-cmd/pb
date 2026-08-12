@@ -60,7 +60,7 @@
 | M9 | POS & Kho | ✅ **HOÀN THÀNH** |
 | M10 | Báo cáo & Dashboard | ✅ **HOÀN THÀNH** |
 | M11 | API & Tích hợp | ✅ **NỀN TẢNG HOÀN THÀNH** |
-| M12 | Community + AI + Livestream | 🚧 Community hoàn thành nền tảng; AI/Livestream chờ adapter triển khai |
+| M12 | Community + AI + Livestream | ✅ **NỀN TẢNG HOÀN THÀNH** (local scheduling, livestream channel, signed webhook) |
 
 ---
 
@@ -135,16 +135,19 @@
 - Doanh thu, occupancy, giờ cao điểm, xuất Excel/PDF
 
 ### M11 — API & Tích hợp
-- JWT chuẩn (refresh rotation), OpenAPI docs, rate limit, webhook, Zalo OA
+- JWT chuẩn (refresh rotation), OpenAPI docs, rate limit, webhook queue/retry HMAC; provider Zalo OA để mở rộng
 
 ### M12 — Community + AI + Livestream
-- Bài đăng/nhóm/sự kiện; AI scheduling (Python OR-Tools); livestream sân
+- Bài đăng/comment/reaction tenant-scoped; AI scheduling human-in-the-loop với local heuristic và adapter OR-Tools fallback; livestream channel YouTube/Facebook/custom với player/API; outbound webhook HTTPS mã hóa secret, HMAC và retry queue
 
 ---
 
 ## 4. Ghi chú vận hành
 - Chạy dev: `php spark serve --port 8080` → http://localhost:8080
 - Chạy lại từ đầu: drop DB → `php spark migrate --all` → `php spark db:seed CoreSeeder` (+ các seeder demo)
+- Seed dữ liệu mẫu thương mại đầy đủ, có thể chạy lặp an toàn: `php spark db:seed CommercialDemoSeeder`
+- Tenant demo: `DEMO-PB`; admin `admin@demo-pickleball.vn / admin123`; quản lý `manager@demo-pickleball.vn / password`; người chơi `player@demo-pickleball.vn / password`.
+- Seeder bao phủ SaaS plan, facility/branch/court, booking/finance, 500 players + membership/wallet/ranking, POS/kho, team/social/open-play, coaching, tournament/competition, growth/community, recurring/waitlist/walk-in, notification, AI scheduling, livestream và webhook.
 - 6 migration cũ nằm trong thư mục con `app/Database/Migrations/2026-*/` — schema gốc đã apply qua `app/Database/SQL/create_all_tables.sql` (sẽ chuẩn hóa ở M1)
 
 ---
@@ -308,7 +311,7 @@ Roadmap này dùng để chia việc theo giá trị vận hành. Một cụm ch
 - Queue worker và retry/dead-letter rõ ràng.
 - Email/SMS/Push adapter.
 - Media permission theo tenant/branch, file type/size policy.
-- Webhook outbound cho đối tác.
+- Webhook outbound cho đối tác: endpoint tenant-scoped, secret mã hóa, HMAC signature, delivery log, retry/backoff và CLI worker.
 
 **Phụ thuộc:** Cụm A; tích hợp sâu theo từng cụm nghiệp vụ.
 
@@ -462,5 +465,17 @@ API, vận hành và cộng đồng đã được harden tiếp:
 - Coaching session được tự tạo invoice khi approve; player có thể thanh toán phần còn lại bằng wallet với tenant check, payer check và idempotency key.
 - API mobile đã có coaching sessions/join/pay và competition list/detail/ladder response dưới `apiauth`; dashboard/report bổ sung hóa đơn, đã thu và công nợ.
 - API có rate-limit filter 120 request/phút theo client identity, phản hồi 429/Retry-After và contract được ghi tại `docs/OPENAPI.md`.
-- Community đã có post/comment/reaction, tenant-scoped feed, player menu, API mobile, transaction và audit; AI scheduling/livestream cần provider/credentials thực tế.
-- Full test hiện tại: 124 tests, 342 assertions; migration đã chạy đến `2026-08-09-270000`.
+- Community đã có post/comment/reaction, tenant-scoped feed, player menu, API mobile, transaction và audit.
+- AI scheduling đã có migration `280000`, request queue, local heuristic/fallback cho OR-Tools, tenant validation, audit, admin/API và human approval boundary.
+- Livestream đã có migration `290000`, channel lifecycle, HTTPS URL validation, player/API surface, admin route/menu và audit.
+- Webhook đã có migration `300000`, endpoint secret mã hóa, event dispatch sau booking commit, HMAC SHA-256, delivery retry/backoff, CLI worker `webhooks:deliver`, admin route/menu và audit.
+- P8 nâng cao đã bổ sung integration registry, tenant integration health check, scoped partner API key lifecycle, Partner API `/api/partner/v1` và signed national player QR card; demo seed phủ đủ 3 active tenant.
+- International foundation đã bổ sung country/region context, BCP-47 locale, IANA timezone, multi-currency fields, organization memberships, versioned competition ruleset, tournament provenance và public `/api/public/v1/countries`.
+- Tenant Policy đã có registry/mặc định idempotent (`375000`), tenant guard cho Match/Result/legacy rating-ranking, Availability facade cho weekly court slots, và queue tenant/idempotency hardening (`376000`).
+- Rating Rebuild và Ranking Rebuild có CLI dry-run, idempotency, drift report và snapshot theo tenant.
+- Availability performance đã có index cho court/booking/maintenance/opening-hour/holiday, tenant predicate và request cache cho weekly matrix.
+- Data Quality dashboard `/admin/data-quality` kiểm tra orphan/cross-tenant booking, overlap, profile, provenance, integrity flag, policy và failed job.
+- Governance UI `/admin/governance` xử lý dispute/correction theo tenant, có approve/reject và reversal boundary.
+- Queue Monitoring `/admin/queue` hiển thị queue state, retry có kiểm soát và dead-letter metadata (`382000`).
+- Print Center nâng cao: tìm kiếm/lọc trạng thái, danh sách giải có phân trang theo tenant, tổng quan hạng mục/đăng ký/trận/check-in và 12 mẫu tài liệu vận hành gồm participants/check-in.
+- Full test hiện tại: `171 tests, 514 assertions`; migration đã chạy đến `2026-08-09-382000`.

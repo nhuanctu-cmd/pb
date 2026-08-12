@@ -333,6 +333,9 @@ return [
     'menu_pos'              => 'Bán hàng (POS)',
     'menu_tournaments'      => 'Giải đấu',
     'menu_competitions'     => 'League & Bảng xếp hạng',
+    'menu_ai_scheduling'    => 'Xếp lịch AI',
+    'menu_livestream'       => 'Livestream',
+    'menu_webhooks'         => 'Webhooks',
     'menu_growth'           => 'Growth & CRM',
     'menu_pricing_rules'    => 'Bảng giá động',
     'menu_courts'           => 'Sân & lịch',
@@ -354,6 +357,7 @@ return [
     'menu_settings'         => 'Thiết lập',
     'menu_group_operations' => 'Vận hành',
     'menu_group_customers'  => 'Khách hàng',
+    'menu_customers'        => 'Customer CRM',
     'menu_group_admin'      => 'Quản trị',
 
     // Settings
@@ -444,4 +448,22 @@ return [
     'facility_create'    => 'Thêm cụm sân',
     'facility_edit'      => 'Sửa cụm sân',
     'facility_dashboard' => 'Tổng quan cụm sân',
+
+    // Player navigation
+    'player_book_court' => 'Đặt sân',
+    'player_booking' => 'Đặt sân',
+    'player_team' => 'Đội',
+    'player_find_match' => 'Tìm kèo',
+    'player_open_play' => 'Open Play',
+    'player_coach' => 'Coach',
+    'player_league' => 'League',
+    'player_offers' => 'Ưu đãi',
+    'player_following' => 'Theo dõi',
+    'player_community' => 'Cộng đồng',
+    'player_livestream' => 'Livestream',
+    'player_profile' => 'Hồ sơ',
+    'player_language' => 'Ngôn ngữ',
+    'account_profile' => 'Hồ sơ',
+    'account_settings' => 'Thiết lập',
+    'logout' => 'Đăng xuất',
 ];

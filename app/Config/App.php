@@ -16,7 +16,23 @@ class App extends BaseConfig
      *
      * E.g., http://example.com/
      */
-    public string $baseURL = 'http://localhost:8080/';
+    public string $baseURL = 'http://127.0.0.1:8080/';
+
+    public function __construct()
+    {
+        parent::__construct();
+
+        // Laragon may expose this project as localhost:80, localhost/path or
+        // an auto-created *.test host. Use the active browser host so links
+        // and assets do not point back to a PHP CLI server.
+        $host = trim((string) ($_SERVER['HTTP_HOST'] ?? ''));
+        if ($host !== '') {
+            $scheme = (! empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $this->baseURL = $scheme . '://' . $host . '/';
+        } else {
+            $this->baseURL = (string) env('app.baseURL', $this->baseURL);
+        }
+    }
 
     /**
      * Allowed Hostnames in the Site URL other than the hostname in the baseURL.

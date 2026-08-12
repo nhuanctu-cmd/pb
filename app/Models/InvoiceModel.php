@@ -11,7 +11,7 @@ class InvoiceModel extends Model
     protected $useAutoIncrement = true;
     protected $returnType       = \App\Entities\Invoice::class;
     protected $useSoftDeletes   = false;
-    protected $allowedFields    = ['tenant_id', 'branch_id', 'invoice_code', 'customer_type', 'player_id', 'ref_type', 'ref_id', 'subtotal', 'discount_amount', 'total_amount', 'paid_amount', 'status', 'note', 'created_by'];
+    protected $allowedFields    = ['tenant_id', 'branch_id', 'invoice_code', 'customer_type', 'player_id', 'customer_id', 'ref_type', 'ref_id', 'subtotal', 'discount_amount', 'total_amount', 'paid_amount', 'status', 'note', 'created_by'];
     protected $useTimestamps    = true;
     protected $createdField     = 'created_at';
     protected $updatedField     = 'updated_at';
@@ -40,7 +40,7 @@ class InvoiceModel extends Model
 
     public function getWithDetails(int $invoiceId, ?int $tenantId = null)
     {
-        $builder = $this->select('invoices.*, players.fullname as player_name, users.fullname as staff_name')
+        $builder = $this->select("invoices.*, players.full_name AS player_name, CONCAT_WS(' ', users.first_name, users.last_name) AS staff_name")
             ->join('players', 'players.id = invoices.player_id', 'left')
             ->join('users', 'users.id = invoices.created_by', 'left')
             ->where('invoices.id', $invoiceId);

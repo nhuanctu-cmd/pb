@@ -333,6 +333,9 @@ return [
     'menu_pos'              => 'Point of Sale',
     'menu_tournaments'      => 'Tournaments',
     'menu_competitions'     => 'Leagues & Standings',
+    'menu_ai_scheduling'    => 'AI Scheduling',
+    'menu_livestream'       => 'Livestream',
+    'menu_webhooks'         => 'Webhooks',
     'menu_growth'           => 'Growth & CRM',
     'menu_pricing_rules'    => 'Dynamic Pricing',
     'menu_courts'           => 'Courts & Schedule',
@@ -354,6 +357,7 @@ return [
     'menu_settings'         => 'Settings',
     'menu_group_operations' => 'Operations',
     'menu_group_customers'  => 'Customers',
+    'menu_customers'        => 'Customer CRM',
     'menu_group_admin'      => 'Administration',
 
     // Settings
@@ -444,4 +448,22 @@ return [
     'facility_create'    => 'Add facility',
     'facility_edit'      => 'Edit facility',
     'facility_dashboard' => 'Facility dashboard',
+
+    // Player navigation
+    'player_book_court' => 'Book a court',
+    'player_booking' => 'Bookings',
+    'player_team' => 'Teams',
+    'player_find_match' => 'Find a match',
+    'player_open_play' => 'Open Play',
+    'player_coach' => 'Coach',
+    'player_league' => 'League',
+    'player_offers' => 'Offers',
+    'player_following' => 'Following',
+    'player_community' => 'Community',
+    'player_livestream' => 'Livestream',
+    'player_profile' => 'Profile',
+    'player_language' => 'Language',
+    'account_profile' => 'Profile',
+    'account_settings' => 'Settings',
+    'logout' => 'Log out',
 ];

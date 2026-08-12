@@ -155,6 +155,18 @@ class MembershipService
         return $this->membershipModel->getByTenant($tenantId, $filters);
     }
 
+    public function getRenewalCandidates(int $tenantId, int $days = 30): array
+    {
+        $db = \Config\Database::connect();
+        return $db->table('memberships m')
+            ->select('m.*, p.player_code, p.full_name, p.phone, mp.name_vi AS package_name_vi, mp.name_en AS package_name_en, mp.price, DATEDIFF(m.end_date, CURDATE()) AS remaining_days')
+            ->join('players p', 'p.id = m.player_id', 'left')
+            ->join('membership_packages mp', 'mp.id = m.package_id', 'left')
+            ->where('m.tenant_id', $tenantId)->where('m.deleted_at', null)->whereIn('m.status', ['active', 'expired'])
+            ->where('m.end_date <=', date('Y-m-d', strtotime('+' . max(0, $days) . ' days')))
+            ->orderBy('m.end_date', 'ASC')->get()->getResult();
+    }
+
     public function getPackages(int $tenantId)
     {
         return $this->packageModel->getActiveByTenant($tenantId);

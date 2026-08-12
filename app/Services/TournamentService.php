@@ -92,6 +92,16 @@ class TournamentService
         return $this->setStatus($id, 'closed', 'Đã đóng đăng ký.', $tenantId);
     }
 
+    public function startTournament(int $id, ?int $tenantId = null): array
+    {
+        return $this->setStatus($id, 'running', 'Đã chuyển giải đấu sang trạng thái đang diễn ra.', $tenantId);
+    }
+
+    public function completeTournament(int $id, ?int $tenantId = null): array
+    {
+        return $this->setStatus($id, 'completed', 'Đã hoàn tất và khóa vòng đời giải đấu.', $tenantId);
+    }
+
     public function publishTournament(int $id, ?int $tenantId = null): array
     {
         return $this->openRegistration($id, $tenantId);

@@ -1,0 +1,95 @@
+openapi: 3.0.3
+info:
+  title: Pickleball Platform Public and Partner API
+  version: 1.0.0
+  description: Public network projections and scoped partner resources. Internal admin routes are not part of this contract.
+servers:
+  - url: /
+paths:
+  /api/public/v1/countries:
+    get:
+      summary: List supported country/currency/timezone contexts
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /api/public/v1/players/{identifier}/card:
+    get:
+      summary: Issue a signed digital player card payload
+      parameters:
+        - $ref: '#/components/parameters/Identifier'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/public/v1/players/card/verify:
+    get:
+      summary: Verify a signed player card token
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Error' }
+  /api/partner/v1/players/{identifier}:
+    get:
+      security: [{ PartnerKey: [] }]
+      summary: Read a public player profile
+      parameters:
+        - $ref: '#/components/parameters/Identifier'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /api/partner/v1/rankings:
+    get:
+      security: [{ PartnerKey: [] }]
+      summary: Read official ranking ledger projection
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, maximum: 100, default: 20 } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /api/partner/v1/clubs:
+    get:
+      security: [{ PartnerKey: [] }]
+      summary: Read verified platform clubs
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /api/partner/v1/tournaments:
+    get:
+      security: [{ PartnerKey: [] }]
+      summary: Read published tournaments
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+components:
+  securitySchemes:
+    PartnerKey:
+      type: apiKey
+      in: header
+      name: X-Partner-Key
+      description: Tenant-scoped key; required scopes are players.read, rankings.read, clubs.read or tournaments.read.
+  parameters:
+    Identifier:
+      name: identifier
+      in: path
+      required: true
+      schema: { type: string }
+  responses:
+    Success:
+      description: Success envelope
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [status, message]
+            properties:
+              status: { type: integer, example: 200 }
+              message: { type: string }
+              data: {}
+    Error:
+      description: Error envelope
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [status, message]
+            properties:
+              status: { type: integer }
+              message: { type: string }

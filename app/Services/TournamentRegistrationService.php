@@ -136,6 +136,19 @@ class TournamentRegistrationService
             }
         }
 
+        $playerIds = [];
+        if (! empty($data['player_id'])) $playerIds[] = (int) $data['player_id'];
+        if (! empty($data['partner_player_id'])) $playerIds[] = (int) $data['partner_player_id'];
+        if (! empty($data['team_id']) && $this->registrationDb()->tableExists('team_members')) {
+            foreach ($this->registrationDb()->table('team_members')->select('player_id')->where('team_id', (int) $data['team_id'])->where('tenant_id', $tenantId)->whereIn('status', ['accepted', 'active'])->where('deleted_at', null)->get()->getResult() as $member) $playerIds[] = (int) $member->player_id;
+        }
+        $playerIds = array_values(array_unique(array_filter($playerIds)));
+        $rules = is_string($category->eligibility_rules ?? null) ? (json_decode($category->eligibility_rules, true) ?: []) : (array) ($category->eligibility_rules ?? []);
+        $rules = array_merge(['policy' => 'STRICT', 'min_rating' => $category->min_rating, 'max_rating' => $category->max_rating, 'block_unrated' => false], $rules);
+        $eligibility = $playerIds ? service('tournamentEligibilityService')->evaluate($tenantId, $playerIds, (string) ($category->discipline ?: 'singles'), $rules) : ['status' => 'flagged', 'eligible' => false, 'reasons' => [['code' => 'PLAYER_ID_REQUIRED']]];
+        if (($eligibility['status'] ?? 'failed') === 'failed' && ! empty($rules['block_unrated'])) return ['success' => false, 'message' => 'Đăng ký không đạt điều kiện rating/skill.', 'eligibility' => $eligibility];
+        $eligibilityStatus = ! empty($eligibility['eligible']) ? 'passed' : 'flagged';
+
         $registrationId = $this->registrationModel->insert([
             'tenant_id' => $tournament->tenant_id,
             'tournament_id' => $tournament->id,
@@ -146,6 +159,9 @@ class TournamentRegistrationService
             'contact_phone' => $data['contact_phone'],
             'payment_status' => $data['payment_status'] ?? 'unpaid',
             'approval_status' => 'pending',
+            'registration_status' => 'pending',
+            'eligibility_status' => $eligibilityStatus,
+            'partner_player_id' => $data['partner_player_id'] ?? null,
             'note' => $data['note'] ?? null,
         ]);
 
@@ -157,10 +173,16 @@ class TournamentRegistrationService
 
         return [
             'success' => true,
-            'message' => 'Đăng ký đã được gửi, vui lòng chờ duyệt.',
+            'message' => $eligibilityStatus === 'passed' ? 'Đăng ký đã được gửi.' : 'Đăng ký đã được gửi và cần ban tổ chức review eligibility.',
             'registration' => $this->registrationModel->find($registrationId),
             'invoice' => $invoice,
+            'eligibility' => $eligibility,
         ];
+    }
+
+    private function registrationDb()
+    {
+        return ConfigDatabase::connect();
     }
 
     private function findOrCreatePlayer(array $data): int

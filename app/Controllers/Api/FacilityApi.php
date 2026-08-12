@@ -76,6 +76,15 @@ class FacilityApi extends BaseController
         return service('apiResponseService')->success($this->branchModel->getByFacilityForTenant($facilityId, $tenantId));
     }
 
+    public function clubs(int $facilityId)
+    {
+        $tenantId = $this->resolveTenantId();
+        if (! $tenantId || ! $this->facilityModel->findForTenant($facilityId, $tenantId)) {
+            return service('apiResponseService')->notFound();
+        }
+        return service('apiResponseService')->success($this->facilityService->getFacilityClubs($facilityId, $tenantId, true));
+    }
+
     public function branchDetail(int $branchId)
     {
         $tenantId = $this->resolveTenantId();

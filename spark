@@ -62,6 +62,13 @@ ini_set('display_errors', '1');
 // Path to the front controller
 define('FCPATH', __DIR__ . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR);
 
+// Path constants required by newer framework versions before autoloader
+define('ROOTPATH', realpath(__DIR__) . DIRECTORY_SEPARATOR);
+define('APPPATH', realpath(__DIR__ . DIRECTORY_SEPARATOR . 'app') . DIRECTORY_SEPARATOR);
+define('WRITEPATH', realpath(__DIR__ . DIRECTORY_SEPARATOR . 'writable') . DIRECTORY_SEPARATOR);
+define('SYSTEMPATH', realpath(__DIR__ . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'codeigniter4' . DIRECTORY_SEPARATOR . 'framework' . DIRECTORY_SEPARATOR . 'system') . DIRECTORY_SEPARATOR);
+define('SUPPORTPATH', realpath(__DIR__ . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . '_support') . DIRECTORY_SEPARATOR);
+
 // Ensure the current directory is pointing to the front controller's directory
 chdir(FCPATH);
 

@@ -8,6 +8,8 @@ use App\Models\PlayerMatchHistoryModel;
 use App\Models\PlayerModel;
 use App\Models\PlayerRatingModel;
 use App\Models\PlayerStatisticModel;
+use App\Services\UnifiedMatchService;
+use Config\Database;
 
 class PlayerRatingService
 {
@@ -30,6 +32,40 @@ class PlayerRatingService
 
     public function recordMatch(int $tenantId, int $playerId, ?int $opponentId, string $result, array $context = []): ?int
     {
+        if ($this->canonicalReady()) {
+            if (! $opponentId || ! in_array($result, ['win', 'loss', 'draw'], true)) return null;
+            $canonical = new UnifiedMatchService();
+            $created = $canonical->create([
+                'tenant_id' => $tenantId,
+                'source_type' => 'friendly',
+                'discipline' => 'pickleball',
+                'venue_id' => $context['facility_id'] ?? null,
+                'court_id' => $context['court_id'] ?? null,
+                'scheduled_at' => $context['match_date'] ?? null,
+                'metadata' => ['created_from' => 'player_match_history_compatibility_form'],
+                'participants' => [
+                    ['player_id' => $playerId, 'side' => 1],
+                    ['player_id' => $opponentId, 'side' => 2],
+                ],
+            ], $tenantId, $context['created_by'] ?? null);
+            if (empty($created['success'])) return null;
+            $matchId = (int) ($created['match']['match']->id ?? 0);
+            if (! $matchId) return null;
+            $winnerSide = $result === 'win' ? 1 : ($result === 'loss' ? 2 : null);
+            $score = trim((string) ($context['score'] ?? ''));
+            $games = [];
+            if (preg_match('/^(\d+)\s*[-:]\s*(\d+)$/', $score, $matches)) {
+                $games[] = ['game_no' => 1, 'side_a_score' => (int) $matches[1], 'side_b_score' => (int) $matches[2]];
+            }
+            $submitted = $canonical->submitResult($matchId, ['winner_side' => $winnerSide, 'games' => $games, 'notes' => $context['notes'] ?? null], $tenantId, $context['created_by'] ?? null);
+            if (empty($submitted['success'])) return null;
+            $confirmed = $canonical->confirmResult($matchId, $tenantId, $context['created_by'] ?? null);
+            if (empty($confirmed['success'])) return null;
+            $official = $canonical->publishOfficial($matchId, $tenantId, $context['created_by'] ?? null);
+            return ! empty($official['success']) ? $matchId : null;
+        }
+
+        // Compatibility path for installations that have not migrated to Rating Engine V1.
         $playerRating = $this->ratingModel->findOrCreate($tenantId, $playerId);
         $opponentRating = $opponentId ? $this->ratingModel->findOrCreate($tenantId, $opponentId) : null;
 
@@ -83,7 +119,29 @@ class PlayerRatingService
 
     public function getRankings(int $tenantId, string $scopeType = 'global', ?int $scopeId = null, ?string $region = null): array
     {
+        if ($this->canonicalReady()) {
+            $db = Database::connect();
+            $provider = $db->table('rating_providers')->where('code', 'internal-v1')->where('status', 'active')->get()->getRow();
+            $discipline = $db->table('rating_disciplines')->where('code', 'singles')->where('active', 1)->get()->getRow();
+            if ($provider && $discipline) {
+                $builder = $db->table('player_rating_profiles r')
+                    ->select('r.*, r.rating_value AS rating, r.rated_match_count AS games_played, 0 AS wins, 0 AS losses, "global" AS scope_type, NULL AS scope_id, p.full_name, p.player_code, p.level, p.region, p.home_branch_id', false)
+                    ->join('players p', 'p.id = r.player_id', 'inner')
+                    ->where('r.tenant_id', $tenantId)
+                    ->where('r.provider_id', $provider->id)
+                    ->where('r.discipline_id', $discipline->id)
+                    ->where('p.deleted_at', null);
+                if ($region) $builder->where('p.region', $region);
+                return $builder->orderBy('r.rating_value', 'DESC')->orderBy('r.reliability_score', 'DESC')->limit(100)->get()->getResult();
+            }
+        }
         return $this->ratingModel->getRanking($tenantId, $scopeType, $scopeId, $region);
+    }
+
+    private function canonicalReady(): bool
+    {
+        $db = Database::connect();
+        return $db->tableExists('player_rating_profiles') && $db->tableExists('rating_transactions');
     }
 
     private function syncStatistics(int $tenantId, int $playerId, int $rating, string $result, bool $isMvp): void

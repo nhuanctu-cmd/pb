@@ -411,12 +411,83 @@ class TournamentSchedulerService
 
     public function getMatches(int $categoryId): array
     {
-        return $this->matchModel
-            ->where('category_id', $categoryId)
-            ->orderBy('scheduled_date', 'ASC')
-            ->orderBy('start_time', 'ASC')
-            ->orderBy('match_no', 'ASC')
-            ->findAll();
+        $builder = $this->db->table('tournament_matches m')
+            ->select('m.*')
+            ->where('m.category_id', $categoryId)
+            ->orderBy('m.scheduled_date', 'ASC')
+            ->orderBy('m.start_time', 'ASC')
+            ->orderBy('m.match_no', 'ASC');
+        if ($this->db->tableExists('teams')) {
+            $builder->select('ta.team_name AS team_a_name, tb.team_name AS team_b_name')
+                ->join('teams ta', 'ta.id = m.team_a_id AND ta.tenant_id = m.tenant_id', 'left')
+                ->join('teams tb', 'tb.id = m.team_b_id AND tb.tenant_id = m.tenant_id', 'left');
+        }
+        if ($this->db->tableExists('courts')) {
+            $builder->select('co.name_vi AS court_name, co.code AS court_code')
+                ->join('courts co', 'co.id = m.court_id AND co.tenant_id = m.tenant_id', 'left');
+        }
+        $matches = $builder->get()->getResult();
+        foreach ($matches as $match) {
+            $match->team_a_label = $match->team_a_name ?: ($match->team_a_id ? 'Đội #' . $match->team_a_id : 'BYE');
+            $match->team_b_label = $match->team_b_name ?: ($match->team_b_id ? 'Đội #' . $match->team_b_id : 'BYE');
+            $match->court_label = $match->court_name ?: ($match->court_id ? 'Sân #' . $match->court_id : 'Chưa xếp sân');
+        }
+        return $matches;
+    }
+
+    /**
+     * Return the knockout tree with the team labels needed by the admin bracket.
+     * Keeping this query here means the scheduler and bracket always use the
+     * same tenant/category scope and match ordering.
+     */
+    public function getVisualBracket(int $categoryId, int $tenantId): array
+    {
+        $categoryType = (string) ($this->db->table('tournament_categories')
+            ->select('category_type')->where('id', $categoryId)->where('tenant_id', $tenantId)->get(1)->getRow('category_type') ?? '');
+        $builder = $this->db->table('tournament_matches m')
+            ->select('m.*, b.round_no, b.bracket_position, b.next_match_id, b.parent_match_id')
+            ->join('tournament_brackets b', 'b.match_id = m.id AND b.category_id = m.category_id', 'inner')
+            ->where('m.category_id', $categoryId)
+            ->where('m.tenant_id', $tenantId)
+            ->orderBy('b.round_no', 'ASC')
+            ->orderBy('b.bracket_position', 'ASC');
+
+        if ($this->db->tableExists('teams')) {
+            $builder->select('ta.team_name AS team_a_name, tb.team_name AS team_b_name')
+                ->join('teams ta', 'ta.id = m.team_a_id AND ta.tenant_id = m.tenant_id', 'left')
+                ->join('teams tb', 'tb.id = m.team_b_id AND tb.tenant_id = m.tenant_id', 'left');
+        }
+        if ($this->db->tableExists('players')) {
+            $builder->select('pa.full_name AS player_a_name, pb.full_name AS player_b_name, pa.player_code AS player_a_code, pb.player_code AS player_b_code')
+                ->join('players pa', 'pa.id = m.team_a_id AND pa.tenant_id = m.tenant_id AND pa.deleted_at IS NULL', 'left')
+                ->join('players pb', 'pb.id = m.team_b_id AND pb.tenant_id = m.tenant_id AND pb.deleted_at IS NULL', 'left');
+        }
+
+        $matches = $builder->get()->getResult();
+        $rounds = [];
+        foreach ($matches as $match) {
+            $isSingles = str_starts_with($categoryType, 'single_');
+            $match->team_a_label = $isSingles
+                ? ($match->player_a_name ?: ($match->team_a_name ?: ($match->team_a_id ? 'VĐV #' . $match->team_a_id : 'TBD')))
+                : ($match->team_a_name ?: ($match->player_a_name ?: ($match->team_a_id ? 'Đội #' . $match->team_a_id : 'TBD')));
+            $match->team_b_label = $isSingles
+                ? ($match->player_b_name ?: ($match->team_b_name ?: ($match->team_b_id ? 'VĐV #' . $match->team_b_id : 'TBD')))
+                : ($match->team_b_name ?: ($match->player_b_name ?: ($match->team_b_id ? 'Đội #' . $match->team_b_id : 'TBD')));
+            $match->status_label = match ($match->status ?? 'scheduled') {
+                'completed', 'walkover' => 'Đã xác nhận',
+                'running', 'in_progress', 'on_court' => 'Đang đấu',
+                'called' => 'Đã gọi',
+                'delayed' => 'Trễ',
+                'cancelled' => 'Đã hủy',
+                'no_show' => 'Vắng mặt',
+                'scheduled' => 'Sắp đấu',
+                default => 'Nháp',
+            };
+            $rounds[(int) $match->round_no][] = $match;
+        }
+
+        ksort($rounds);
+        return $rounds;
     }
 
     private function getGroups(int $categoryId): array

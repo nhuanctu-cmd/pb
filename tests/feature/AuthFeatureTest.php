@@ -25,12 +25,14 @@ class AuthFeatureTest extends CIUnitTestCase
         $result->assertSee('admin@pickleball.com'); // hộp tài khoản demo (dev)
     }
 
-    /** TC02: Trang chủ redirect về đăng nhập */
-    public function testHomeRedirectsToLogin(): void
+    /** TC02: Trang chủ public portal hiển thị không cần đăng nhập */
+    public function testPublicHomeLoadsWithoutLogin(): void
     {
         $result = $this->call('GET', '/');
 
-        $result->assertRedirect();
+        $result->assertOK();
+        $result->assertSee('Bảng xếp hạng');
+        $result->assertSee('Tìm vận động viên');
     }
 
     /** TC03: Đăng nhập thất bại khi sai mật khẩu */

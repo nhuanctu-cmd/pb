@@ -1,0 +1,66 @@
+:root {
+    --ops-ink: #102a43;
+    --ops-muted: #64748b;
+    --ops-line: #e5edf5;
+    --ops-soft: #f6f9fc;
+    --ops-blue: #2563eb;
+    --ops-green: #16a34a;
+    --ops-amber: #d97706;
+    --ops-red: #dc2626;
+}
+
+.ops-surface { color: var(--ops-ink); }
+.ops-toolbar { border: 1px solid var(--ops-line); background: linear-gradient(135deg, #fff 0%, #f8fbff 100%); box-shadow: 0 8px 24px rgba(15, 23, 42, .04); }
+.ops-toolbar .form-label { font-size: .72rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ops-muted); }
+.ops-hero { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:20px 22px; border-radius:16px; background: linear-gradient(110deg, #102a43, #174b72); color:#fff; box-shadow: 0 14px 30px rgba(16, 42, 67, .16); }
+.ops-hero h2 { letter-spacing: -.03em; }
+.ops-hero .ops-meta { color: rgba(255,255,255,.72); font-size:.88rem; }
+.ops-hero .erp-btn { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.25); color:#fff; }
+.ops-hero .erp-btn:hover { background:#fff; color:var(--ops-ink); }
+.ops-section-heading { display:flex; align-items:end; justify-content:space-between; gap:12px; margin: 22px 0 10px; }
+.ops-section-heading h3 { margin:0; color:var(--ops-ink); letter-spacing:-.02em; }
+.ops-section-heading span { color:var(--ops-muted); font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; }
+.control-stat { position:relative; overflow:hidden; border-color:var(--ops-line)!important; box-shadow:0 5px 16px rgba(15,23,42,.04); transition:transform .18s ease, box-shadow .18s ease; }
+.control-stat:hover { transform:translateY(-2px); box-shadow:0 10px 22px rgba(15,23,42,.08); }
+.control-stat:after { content:""; position:absolute; right:-22px; bottom:-28px; width:78px; height:78px; border-radius:50%; background:rgba(37,99,235,.07); }
+.control-stat strong { color:var(--ops-ink); font-variant-numeric:tabular-nums; }
+.court-card { border-color:var(--ops-line)!important; box-shadow:0 6px 18px rgba(15,23,42,.05); transition:transform .18s ease, box-shadow .18s ease; }
+.court-card:hover { transform:translateY(-2px); box-shadow:0 12px 25px rgba(15,23,42,.09); }
+.court-card .erp-status { font-size:.68rem; }
+.match-chip { border:1px solid #e8eef5; box-shadow: inset 0 0 0 1px rgba(255,255,255,.7); }
+.match-chip strong { display:inline-block; margin-top:3px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom; }
+.match-chip form .btn { border-radius:7px; font-weight:700; }
+.ops-card { border:1px solid var(--ops-line); border-radius:15px; background:#fff; box-shadow:0 6px 18px rgba(15,23,42,.04); }
+.ops-card-header { padding:16px 18px; border-bottom:1px solid var(--ops-line); display:flex; justify-content:space-between; align-items:center; }
+.ops-card-header h3 { margin:0; font-size:1rem; color:var(--ops-ink); }
+.ops-card-body { padding:0 18px 18px; }
+.ops-alert-table .erp-table { margin:0; }
+.ops-alert-table .erp-table tbody tr { border-left:3px solid transparent; }
+.ops-alert-table .erp-table tbody tr:hover { background:#f8fbff; border-left-color:var(--ops-blue); }
+.ops-checkin-list { max-height:360px; overflow:auto; }
+.ops-checkin-item { padding:11px 0; border-bottom:1px solid var(--ops-line); }
+.ops-checkin-item:last-child { border-bottom:0; }
+.ops-empty { padding:28px 16px; text-align:center; color:var(--ops-muted); }
+
+.print-center-hero, .template-hero { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:20px 22px; margin-bottom:18px; border-radius:16px; background:linear-gradient(110deg,#102a43,#2563eb); color:#fff; }
+.print-center-hero h2, .template-hero h2 { margin:0; letter-spacing:-.03em; }
+.print-center-hero p, .template-hero p { margin:4px 0 0; color:rgba(255,255,255,.75); }
+.print-option { position:relative; border-color:var(--ops-line)!important; box-shadow:0 6px 18px rgba(15,23,42,.04); transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.print-option:hover { transform:translateY(-3px); border-color:#bcd2f7!important; box-shadow:0 14px 28px rgba(37,99,235,.12); }
+.print-option i { display:grid; place-items:center; width:42px; height:42px; border-radius:12px; background:#eff6ff; color:var(--ops-blue)!important; }
+.print-option h3 { color:var(--ops-ink); }
+.template-card { border:1px solid var(--ops-line); border-radius:15px; background:#fff; padding:18px; box-shadow:0 6px 18px rgba(15,23,42,.04); transition:transform .18s ease, box-shadow .18s ease; }
+.template-card:hover { transform:translateY(-3px); box-shadow:0 14px 28px rgba(15,23,42,.09); }
+.template-card .template-mark { display:grid; place-items:center; width:42px; height:42px; border-radius:12px; background:#eff6ff; color:var(--ops-blue); }
+.template-form-card { border:1px solid var(--ops-line); background:linear-gradient(135deg,#fff,#f8fbff); box-shadow:0 8px 24px rgba(15,23,42,.04); }
+.template-form-card .form-label { font-size:.72rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--ops-muted); }
+.erp-card:has(> form[action*="tournament-templates/save"]), .erp-card:has(> form[action*="tournament-templates/use"]) { border-color:var(--ops-line); background:linear-gradient(135deg,#fff,#f8fbff); box-shadow:0 8px 24px rgba(15,23,42,.05); }
+.erp-card:has(> form[action*="tournament-templates/save"]) .form-label, .erp-card:has(> form[action*="tournament-templates/use"]) .form-label { font-size:.72rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--ops-muted); }
+.erp-card:has(> form[action*="tournament-templates/save"]) + .row .erp-card { border-color:var(--ops-line); box-shadow:0 6px 18px rgba(15,23,42,.04); transition:transform .18s ease, box-shadow .18s ease; }
+.erp-card:has(> form[action*="tournament-templates/save"]) + .row .erp-card:hover { transform:translateY(-3px); box-shadow:0 14px 28px rgba(15,23,42,.09); }
+
+@media (max-width: 768px) {
+    .ops-hero, .print-center-hero, .template-hero { align-items:flex-start; flex-direction:column; }
+    .ops-hero .erp-btn, .print-center-hero .erp-btn, .template-hero .erp-btn { width:100%; }
+    .ops-section-heading { align-items:flex-start; flex-direction:column; }
+}

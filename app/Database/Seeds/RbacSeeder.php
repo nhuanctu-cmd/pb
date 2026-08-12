@@ -65,10 +65,33 @@ class RbacSeeder extends Seeder
             'config' => 'Cấu hình thanh toán',
         ],
         'tournaments' => [
-            'view'   => 'Xem giải đấu',
-            'create' => 'Tạo giải đấu',
-            'edit'   => 'Sửa giải đấu',
-            'manage' => 'Điều hành giải (duyệt/xếp lịch)',
+            'view'      => 'Xem giải đấu',
+            'create'    => 'Tạo giải đấu',
+            'edit'      => 'Sửa giải đấu',
+            'delete'    => 'Xóa giải đấu',
+            'manage'    => 'Điều hành giải (duyệt/xếp lịch)',
+            'sanction'  => 'Phê duyệt giải tính BXH',
+            'checkin'   => 'Check-in VĐV giải đấu',
+        ],
+        'ranking' => [
+            'view'       => 'Xem bảng xếp hạng',
+            'policy'     => 'Quản lý chính sách BXH',
+            'recalculate'=> 'Tính lại BXH',
+            'adjust'     => 'Điều chỉnh điểm BXH',
+            'audit'      => 'Kiểm tra BXH',
+        ],
+        'rating' => [
+            'view'        => 'Xem điểm trình',
+            'policy'      => 'Quản lý chính sách điểm trình',
+            'recalculate' => 'Tính lại điểm trình',
+            'fraud'       => 'Xem cảnh báo gian lận',
+            'review'      => 'Duyệt claim/import và cảnh báo rating',
+            'adjust'      => 'Điều chỉnh rating thủ công',
+            'imports'     => 'Quản lý dữ liệu import rating',
+        ],
+        'player-identity' => [
+            'merge'  => 'Gộp tài khoản VĐV',
+            'verify' => 'Xác thực VĐV',
         ],
         'scores' => [
             'view'  => 'Xem tỷ số',
@@ -168,6 +191,7 @@ class RbacSeeder extends Seeder
             'media.*',
             'notifications.*',
             'reports.*',
+            'rating.*',
         ],
 
         'branch-manager' => [

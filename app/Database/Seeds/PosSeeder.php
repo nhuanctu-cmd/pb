@@ -104,14 +104,28 @@ class PosSeeder extends Seeder
         // Insert initial inventory (100 units for each product)
         $productIds = $this->db->table('products')->where('tenant_id', $tenantId)->get()->getResult('array');
         foreach ($productIds as $product) {
-            $this->db->table('inventories')->insert([
-                'tenant_id'  => $tenantId,
-                'branch_id'  => 1,
-                'product_id' => $product['id'],
-                'quantity'   => 100,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
+            $exists = $this->db->table('inventories')
+                ->where('tenant_id', $tenantId)
+                ->where('branch_id', 1)
+                ->where('product_id', $product['id'])
+                ->countAllResults();
+
+            if ($exists) {
+                $this->db->table('inventories')
+                    ->where('tenant_id', $tenantId)
+                    ->where('branch_id', 1)
+                    ->where('product_id', $product['id'])
+                    ->update(['quantity' => 100, 'updated_at' => $now]);
+            } else {
+                $this->db->table('inventories')->insert([
+                    'tenant_id'  => $tenantId,
+                    'branch_id'  => 1,
+                    'product_id' => $product['id'],
+                    'quantity'   => 100,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
         }
     }
 }

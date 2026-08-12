@@ -30,7 +30,9 @@ class Filters extends BaseFilters
         'permission'    => \App\Filters\PermissionFilter::class,
         'plan'          => \App\Filters\PlanFilter::class,
         'apiauth'       => \App\Filters\ApiAuthFilter::class,
+        'partnerauth'   => \App\Filters\PartnerApiAuthFilter::class,
         'apiratelimit'  => \App\Filters\ApiRateLimitFilter::class,
+        'autobootstrap' => \App\Filters\AutoBootstrapFilter::class,
     ];
 
     public array $required = [
@@ -47,6 +49,7 @@ class Filters extends BaseFilters
 
     public array $globals = [
         'before' => [
+            'autobootstrap',
             // 'honeypot',
             // 'csrf',
             // 'invalidchars',

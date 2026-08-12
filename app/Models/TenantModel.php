@@ -13,7 +13,7 @@ class TenantModel extends Model
     protected $useSoftDeletes   = true;
     protected $protectFields    = true;
     protected $allowedFields    = [
-        'code', 'name', 'email', 'phone', 'address', 'logo',
+        'code', 'country_code', 'default_timezone', 'default_currency', 'default_locale', 'name', 'email', 'phone', 'address', 'logo',
         'domain', 'db_name', 'is_active', 'status',
         'created_by', 'updated_by',
     ];

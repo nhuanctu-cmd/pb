@@ -9,10 +9,12 @@ use App\Models\BookingLogModel;
 use App\Models\BranchModel;
 use App\Models\CourtModel;
 use App\Services\BookingService;
+use App\Services\AvailabilityService;
 
 class BookingsController extends BaseController
 {
     protected BookingService $bookingService;
+    protected AvailabilityService $availabilityService;
     protected BookingModel $bookingModel;
     protected BranchModel $branchModel;
     protected CourtModel $courtModel;
@@ -20,6 +22,7 @@ class BookingsController extends BaseController
     public function __construct()
     {
         $this->bookingService = service('bookingService');
+        $this->availabilityService = service('availabilityService');
         $this->bookingModel   = model(BookingModel::class);
         $this->branchModel    = model(BranchModel::class);
         $this->courtModel     = model(CourtModel::class);
@@ -73,11 +76,9 @@ class BookingsController extends BaseController
             return $this->response->setJSON(['success' => false, 'message' => lang('App.invalid_data')]);
         }
 
-        $slots = $this->bookingService->getAvailableSlots(
-            (int) $courtId, $date, 60, (int) session()->get('tenant_id')
-        );
+        $availability = $this->availabilityService->slots((int) $courtId, $date, (int) session()->get('tenant_id'));
 
-        return $this->response->setJSON(['success' => true, 'slots' => $slots]);
+        return $this->response->setJSON($availability);
     }
 
     /**
@@ -97,15 +98,16 @@ class BookingsController extends BaseController
         }
 
         try {
-            $data = $this->bookingService->getWeeklyAvailability($branchId, $weekStart, $tenantId);
-        } catch (\InvalidArgumentException $exception) {
+            $data = $this->availabilityService->weekly($branchId, $weekStart, $tenantId);
+            if (empty($data['success'])) return $this->response->setStatusCode(422)->setJSON($data);
+        } catch (\Throwable $exception) {
             return $this->response->setStatusCode(422)->setJSON([
                 'success' => false,
                 'message' => lang('App.invalid_data'),
             ]);
         }
 
-        return $this->response->setJSON(['success' => true, 'data' => $data]);
+        return $this->response->setJSON($data);
     }
 
     /**

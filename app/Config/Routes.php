@@ -6,6 +6,22 @@ use CodeIgniter\Router\RouteCollection;
 
 // ========== PUBLIC ROUTES ==========
 $routes->get('/', 'Home::index');
+$routes->get('/ranking', 'PublicPortal::ranking', ['namespace' => 'App\Controllers\Public']);
+$routes->get('/players', 'PublicPortal::players', ['namespace' => 'App\Controllers\Public']);
+$routes->get('/matches', 'PublicPortal::matches', ['namespace' => 'App\Controllers\Public']);
+$routes->get('/clubs', 'PublicPortal::clubs', ['namespace' => 'App\Controllers\Public']);
+$routes->get('/calendar', 'PublicPortal::calendar', ['namespace' => 'App\Controllers\Public']);
+$routes->get('/live', 'PublicPortal::live', ['namespace' => 'App\Controllers\Public']);
+$routes->get('/verify', 'PublicPortal::verify', ['namespace' => 'App\Controllers\Public']);
+$routes->get('/solutions', 'Sales::index');
+$routes->get('/solutions/(:segment)', 'Sales::product/$1');
+$routes->get('/pricing', 'Sales::pricing');
+$routes->get('/developers', 'Sales::developers');
+$routes->get('/developers/docs', 'Sales::developers');
+$routes->get('/api', 'Sales::developers');
+$routes->get('/ranking/pro', 'Sales::rankingPro');
+$routes->get('/demo', 'Sales::demo');
+$routes->post('/demo', 'Sales::demo');
 $routes->get('/login', 'AuthController::login');
 $routes->post('/login', 'AuthController::loginPost');
 $routes->get('/logout', 'AuthController::logout');
@@ -19,8 +35,28 @@ $routes->get('/live-scores/bracket', 'LiveScores::bracket', ['namespace' => 'App
 $routes->get('/live-scores/tv', 'LiveScores::tv', ['namespace' => 'App\Controllers\Public']);
 $routes->get('/tournaments', 'Tournaments::list', ['namespace' => 'App\Controllers\Public']);
 $routes->get('/tournaments/(:segment)', 'Tournaments::detail/$1', ['namespace' => 'App\Controllers\Public']);
+$routes->get('/tournaments/(:segment)/tv', 'Tournaments::tv/$1', ['namespace' => 'App\Controllers\Public']);
+$routes->get('/tournaments/(:segment)/live', 'Tournaments::tv/$1', ['namespace' => 'App\Controllers\Public']);
 $routes->get('/tournaments/(:segment)/register', 'Tournaments::register/$1', ['namespace' => 'App\Controllers\Public']);
 $routes->post('/tournaments/(:segment)/register', 'Tournaments::submitRegistration/$1', ['namespace' => 'App\Controllers\Public']);
+
+$routes->group('api/public/v1', ['namespace' => 'App\Controllers\Api'], function ($routes) {
+    $routes->get('home', 'PublicPortalApi::home');
+    $routes->get('search', 'PublicPortalApi::search');
+    $routes->get('players/(:num)/rating-history', 'PublicPortalApi::ratingHistory/$1');
+    $routes->get('countries', 'PublicPortalApi::countries');
+    $routes->get('players/(:segment)/ratings', 'RatingApi::publicRatings/$1');
+    $routes->get('players/card/verify', 'PublicPortalApi::verifyPlayerCard');
+    $routes->get('players/(:segment)/card', 'PublicPortalApi::playerCard/$1');
+});
+
+// Partner API — chỉ dữ liệu network công khai, luôn yêu cầu key + scope.
+$routes->group('api/partner/v1', ['namespace' => 'App\Controllers\Api', 'filter' => 'apiratelimit'], function ($routes) {
+    $routes->get('players/(:segment)', 'PartnerApiController::player/$1', ['filter' => 'partnerauth:players.read']);
+    $routes->get('rankings', 'PartnerApiController::rankings', ['filter' => 'partnerauth:rankings.read']);
+    $routes->get('clubs', 'PartnerApiController::clubs', ['filter' => 'partnerauth:clubs.read']);
+    $routes->get('tournaments', 'PartnerApiController::tournaments', ['filter' => 'partnerauth:tournaments.read']);
+});
 
 // ========== API ROUTES ==========
 $routes->group('api/v1', ['namespace' => 'App\Controllers\Api'], function ($routes) {
@@ -34,12 +70,14 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api'], function ($rout
     $routes->get('live-scores', 'LiveScores::index');
     $routes->get('live-scores/tv', 'LiveScores::tv');
     $routes->get('live-scores/bracket', 'LiveScores::bracket');
+    $routes->get('network/clubs', 'PlatformClubApi::index');
 
         // Facility API routes
         $routes->get('facilities', 'FacilityApi::index');
         $routes->get('facilities/(:num)', 'FacilityApi::show/$1');
         $routes->get('facilities/(:num)/dashboard', 'FacilityApi::dashboard/$1');
-        $routes->get('facilities/(:num)/branches', 'FacilityApi::branches/$1');
+    $routes->get('facilities/(:num)/branches', 'FacilityApi::branches/$1');
+    $routes->get('facilities/(:num)/clubs', 'FacilityApi::clubs/$1');
         $routes->get('facilities/branch/(:num)', 'FacilityApi::branchDetail/$1');
         $routes->get('facilities/branch/(:num)/hours', 'FacilityApi::branchOpeningHours/$1');
         $routes->get('facilities/branch/(:num)/holidays', 'FacilityApi::branchHolidays/$1');
@@ -99,11 +137,43 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api'], function ($rout
         });
         $routes->post('live-scores/(:num)', 'LiveScores::update/$1');
 
+        // Unified match and immutable official-result workflow
+        $routes->post('matches', 'UnifiedMatchApi::create');
+        $routes->get('matches/(:num)', 'UnifiedMatchApi::show/$1');
+        $routes->post('matches/(:num)/result', 'UnifiedMatchApi::submit/$1');
+        $routes->post('matches/(:num)/confirm', 'UnifiedMatchApi::confirm/$1');
+        $routes->post('matches/(:num)/official', 'UnifiedMatchApi::official/$1');
+        $routes->post('matches/(:num)/dispute', 'MatchGovernanceApi::dispute/$1');
+        $routes->post('match-disputes/(:num)/resolve', 'MatchGovernanceApi::resolve/$1');
+
+        // Trust & competition foundations: authority, provenance, appeals and corrections.
+        $routes->get('provenance/(:segment)/(:num)', 'FoundationApi::provenance/$1/$2');
+        $routes->post('governance/authorities', 'FoundationApi::authority');
+        $routes->post('governance/decisions', 'FoundationApi::decision');
+        $routes->post('governance/sanctions/(:num)/transition', 'FoundationApi::sanction/$1');
+        $routes->post('governance/appeals', 'FoundationApi::appeal');
+        $routes->post('governance/appeals/(:num)/transition', 'FoundationApi::appealTransition/$1');
+        $routes->post('matches/(:num)/corrections', 'FoundationApi::correction/$1');
+        $routes->post('correction-requests/(:num)/approve', 'FoundationApi::approveCorrection/$1');
+        $routes->post('correction-requests/(:num)/reject', 'FoundationApi::rejectCorrection/$1');
+        $routes->post('tournament-matches/(:num)/sync-unified', 'TournamentMatchNetworkApi::sync/$1');
+        $routes->post('tournament-matches/(:num)/official-result', 'TournamentMatchNetworkApi::official/$1');
+
         // Player mobile API routes
         $routes->get('player/profile', 'PlayerApi::profile');
         $routes->post('player/update-profile', 'PlayerApi::updateProfile');
         $routes->get('player/wallet', 'PlayerApi::wallet');
         $routes->get('player/ranking', 'PlayerApi::ranking');
+        $routes->get('players/(:num)/ratings', 'RatingApi::profile/$1');
+        $routes->get('players/(:num)/ratings/(:segment)/history', 'RatingApi::history/$1/$2');
+        $routes->post('player/skill-assessments', 'RatingApi::assessment');
+        $routes->post('player/rating-claims', 'RatingApi::claim');
+        $routes->post('rating/eligibility', 'RatingApi::eligibility');
+        $routes->post('rating/imports', 'RatingApi::importUpload');
+        $routes->post('rating/imports/(:num)/(:segment)', 'RatingApi::importStep/$1/$2');
+        $routes->get('rankings/leaderboard', 'RankingApi::leaderboard');
+        $routes->post('network/clubs', 'PlatformClubApi::create');
+        $routes->post('network/clubs/(:num)/link', 'PlatformClubApi::link/$1');
 
         // Coaching and competition mobile surface
         $routes->get('coaching/sessions', 'CoachingApi::index');
@@ -117,6 +187,10 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api'], function ($rout
         $routes->post('community/posts', 'CommunityApi::store');
         $routes->post('community/posts/(:num)/comments', 'CommunityApi::comment/$1');
         $routes->post('community/posts/(:num)/reactions', 'CommunityApi::react/$1');
+        $routes->get('ai-scheduling/requests', 'AiSchedulingApi::index');
+        $routes->post('ai-scheduling/requests', 'AiSchedulingApi::store');
+        $routes->post('ai-scheduling/requests/(:num)/run', 'AiSchedulingApi::run/$1');
+        $routes->get('livestream/channels', 'LivestreamApi::index');
     });
 });
 
@@ -124,6 +198,18 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api'], function ($rout
 $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($routes) {
     // Auth protected routes
     $routes->group('', ['filter' => 'auth'], function ($routes) {
+        $routes->get('rating', 'RatingGovernanceController::index', ['filter' => 'permission:rating.view']);
+        $routes->get('data-quality', 'DataQualityController::index', ['filter' => 'permission:dashboard.view']);
+        $routes->get('governance', 'GovernanceController::index', ['filter' => 'permission:rating.review']);
+        $routes->post('governance/disputes/(:num)/resolve', 'GovernanceController::resolveDispute/$1', ['filter' => 'permission:rating.review']);
+        $routes->post('governance/corrections/(:num)/approve', 'GovernanceController::approveCorrection/$1', ['filter' => 'permission:rating.review']);
+        $routes->post('governance/corrections/(:num)/reject', 'GovernanceController::rejectCorrection/$1', ['filter' => 'permission:rating.review']);
+        $routes->get('queue', 'QueueMonitorController::index', ['filter' => 'permission:dashboard.view']);
+        $routes->post('queue/(:num)/retry', 'QueueMonitorController::retry/$1', ['filter' => 'permission:dashboard.view']);
+        $routes->post('queue/(:num)/dead-letter', 'QueueMonitorController::deadLetter/$1', ['filter' => 'permission:dashboard.view']);
+        $routes->post('rating/adjust', 'RatingGovernanceController::adjust', ['filter' => 'permission:rating.adjust']);
+        $routes->post('rating/claims/(:num)/verify', 'RatingGovernanceController::verifyClaim/$1', ['filter' => 'permission:rating.review']);
+        $routes->post('rating/flags/(:num)/resolve', 'RatingGovernanceController::resolveFlag/$1', ['filter' => 'permission:rating.review']);
         $routes->get('dashboard', 'DashboardController::index');
 
         $routes->group('ops', ['filter' => 'permission:bookings.view'], function ($routes) {
@@ -145,6 +231,9 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
             $routes->get('delete/(:num)', 'FacilitiesController::delete/$1');
             $routes->get('dashboard/(:num)', 'FacilitiesController::dashboard/$1');
             $routes->get('branches/(:num)', 'FacilitiesController::branches/$1');
+            $routes->get('clubs/(:num)', 'FacilitiesController::clubs/$1');
+            $routes->post('clubs/(:num)/assign', 'FacilitiesController::assignClub/$1');
+            $routes->post('clubs/(:num)/remove/(:num)', 'FacilitiesController::removeClub/$1/$2');
         });
 
         // Court grid & timeline routes
@@ -271,6 +360,16 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
             $routes->post('cancel/(:num)', 'WalkInsController::cancel/$1');
         });
 
+        $routes->group('front-desk', ['filter' => 'permission:bookings.view'], function ($routes) {
+            $routes->get('/', 'FrontDeskController::index');
+        });
+
+        $routes->group('daily-closing', ['filter' => 'permission:payments.view'], function ($routes) {
+            $routes->get('/', 'DailyClosingController::index');
+            $routes->post('close', 'DailyClosingController::close');
+            $routes->post('reopen', 'DailyClosingController::reopen');
+        });
+
         $routes->group('operations-report', ['filter' => 'permission:dashboard.view'], function ($routes) {
             $routes->get('/', 'OperationsReportController::index');
             $routes->get('csv', 'OperationsReportController::csv');
@@ -321,25 +420,58 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
         $routes->group('scores', ['filter' => 'permission:scores.view'], function ($routes) {
             $routes->get('/', 'Scores::index');
             $routes->get('(:num)', 'Scores::edit/$1');
-            $routes->post('(:num)/start', 'Scores::start/$1');
-            $routes->post('(:num)/update', 'Scores::update/$1');
-            $routes->post('(:num)/finish', 'Scores::finish/$1');
+            $routes->post('(:num)/start', 'Scores::start/$1', ['filter' => 'permission:scores.input']);
+            $routes->post('(:num)/update', 'Scores::update/$1', ['filter' => 'permission:scores.input']);
+            $routes->post('(:num)/finish', 'Scores::finish/$1', ['filter' => 'permission:scores.input']);
+            $routes->post('(:num)/lock', 'Scores::lock/$1', ['filter' => 'permission:scores.input']);
+            $routes->post('(:num)/unlock', 'Scores::unlock/$1', ['filter' => 'permission:scores.input']);
         });
 
         // Tournament setup routes (yêu cầu gói có tính năng giải đấu)
         $routes->group('tournaments', ['filter' => ['permission:tournaments.view', 'plan:tournament']], function ($routes) {
             $routes->get('/', 'Tournaments::index');
+            $routes->get('export', 'Tournaments::export');
             $routes->get('create', 'Tournaments::create');
             $routes->post('store', 'Tournaments::store');
             $routes->get('edit/(:num)', 'Tournaments::edit/$1');
             $routes->post('update/(:num)', 'Tournaments::update/$1');
             $routes->get('show/(:num)', 'Tournaments::show/$1');
+            $routes->get('registrations', 'Tournaments::registrationHub');
             $routes->get('registrations/(:num)', 'Tournaments::registrations/$1');
-            $routes->post('registrations/(:num)/approve', 'Tournaments::approveRegistration/$1');
-            $routes->post('registrations/(:num)/reject', 'Tournaments::rejectRegistration/$1');
-            $routes->post('open/(:num)', 'Tournaments::open/$1');
-            $routes->post('close/(:num)', 'Tournaments::close/$1');
-            $routes->post('cancel/(:num)', 'Tournaments::cancel/$1');
+            $routes->get('registrations/(:num)/export', 'Tournaments::exportRegistrations/$1');
+            $routes->post('registrations/(:num)/store', 'Tournaments::registerAthlete/$1', ['filter' => 'permission:tournaments.manage']);
+            $routes->post('registrations/(:num)/update', 'Tournaments::updateRegistration/$1', ['filter' => 'permission:tournaments.manage']);
+            $routes->post('registrations/(:num)/checkin', 'Tournaments::checkinRegistration/$1', ['filter' => 'permission:tournaments.manage']);
+            $routes->post('registrations/(:num)/delete', 'Tournaments::deleteRegistration/$1', ['filter' => 'permission:tournaments.manage']);
+            $routes->post('registrations/(:num)/approve', 'Tournaments::approveRegistration/$1', ['filter' => 'permission:tournaments.manage']);
+            $routes->post('registrations/(:num)/reject', 'Tournaments::rejectRegistration/$1', ['filter' => 'permission:tournaments.manage']);
+            $routes->post('open/(:num)', 'Tournaments::open/$1', ['filter' => 'permission:tournaments.manage']);
+            $routes->post('close/(:num)', 'Tournaments::close/$1', ['filter' => 'permission:tournaments.manage']);
+            $routes->post('start/(:num)', 'Tournaments::start/$1', ['filter' => 'permission:tournaments.manage']);
+            $routes->post('complete/(:num)', 'Tournaments::complete/$1', ['filter' => 'permission:tournaments.manage']);
+            $routes->post('cancel/(:num)', 'Tournaments::cancel/$1', ['filter' => 'permission:tournaments.manage']);
+        });
+
+        $routes->group('tournaments/control-room', ['filter' => ['permission:tournaments.view', 'plan:tournament']], function ($routes) {
+            $routes->get('/', 'TournamentOperationsController::index');
+            $routes->get('data', 'TournamentOperationsController::data');
+            $routes->post('status/(:num)', 'TournamentOperationsController::status/$1', ['filter' => 'permission:tournaments.manage']);
+            $routes->post('call/(:num)', 'TournamentOperationsController::call/$1', ['filter' => 'permission:tournaments.manage']);
+        });
+        $routes->group('tournaments/bracket', ['filter' => ['permission:tournaments.view', 'plan:tournament']], function ($routes) {
+            $routes->get('/', 'TournamentBracketController::index');
+            $routes->get('export/(:num)', 'TournamentBracketController::export/$1');
+            $routes->post('rerun/(:num)', 'TournamentBracketController::rerun/$1', ['filter' => 'permission:tournaments.manage']);
+        });
+        $routes->group('tournament-templates', ['filter' => ['permission:tournaments.view', 'plan:tournament']], function ($routes) {
+            $routes->get('/', 'TournamentTemplatesController::index');
+            $routes->post('save', 'TournamentTemplatesController::saveFromTournament', ['filter' => 'permission:tournaments.manage']);
+            $routes->get('use/(:num)', 'TournamentTemplatesController::use/$1');
+            $routes->post('use/(:num)', 'TournamentTemplatesController::create/$1', ['filter' => 'permission:tournaments.manage']);
+        });
+        $routes->group('print-center', ['filter' => ['permission:tournaments.view', 'plan:tournament']], function ($routes) {
+            $routes->get('/', 'PrintCenterController::index');
+            $routes->get('print', 'PrintCenterController::print');
         });
 
         // Dynamic pricing routes
@@ -374,6 +506,23 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
             $routes->get('booking-history/(:num)', 'PlayersController::bookingHistory/$1');
         });
 
+        // CRM customer directory (Customer is separate from Player Registry)
+        $routes->group('customers', ['filter' => 'permission:players.view'], function ($routes) {
+            $routes->get('/', 'CustomersController::index');
+            $routes->get('show/(:num)', 'CustomersController::show/$1');
+            $routes->post('status/(:num)', 'CustomersController::updateStatus/$1');
+            $routes->post('tags/(:num)', 'CustomersController::syncTags/$1');
+            $routes->post('tags/(:num)/remove/(:num)', 'CustomersController::unlinkTag/$1/$2');
+            $routes->post('note/(:num)', 'CustomersController::addNote/$1');
+            $routes->get('create-booking/(:num)', 'CustomersController::quickCreateBooking/$1');
+        });
+
+        $routes->group('crm-campaigns', ['filter' => 'permission:players.view'], function ($routes) {
+            $routes->get('/', 'CrmCampaignsController::index');
+            $routes->post('store', 'CrmCampaignsController::store');
+            $routes->post('launch/(:num)', 'CrmCampaignsController::launch/$1');
+        });
+
         // Club, team and social match routes
         $routes->group('clubs', ['filter' => 'permission:clubs.view'], function ($routes) {
             $routes->get('/', 'ClubsController::index');
@@ -401,6 +550,8 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
         // Membership routes
         $routes->group('memberships', ['filter' => 'permission:memberships.view'], function ($routes) {
             $routes->get('/', 'MembershipsController::index');
+            $routes->get('renewals', 'MembershipsController::renewals');
+            $routes->post('renew/(:num)', 'MembershipsController::renew/$1');
             $routes->get('create', 'MembershipsController::create');
             $routes->post('store', 'MembershipsController::store');
             $routes->get('cancel/(:num)', 'MembershipsController::cancel/$1');
@@ -417,15 +568,51 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
             $routes->get('/', 'TournamentSchedulerController::index');
             $routes->post('auto-schedule', 'TournamentSchedulerController::autoSchedule');
             $routes->post('rerun-unlocked', 'TournamentSchedulerController::rerunUnlocked');
+            $routes->post('schedule/(:num)', 'TournamentSchedulerController::schedule/$1');
+            $routes->post('manual', 'TournamentSchedulerController::manualMatch');
+            $routes->post('matches/(:num)/participants', 'TournamentSchedulerController::assignParticipants/$1');
+            $routes->post('publish/(:num)', 'TournamentSchedulerController::publish/$1');
+            $routes->post('unpublish/(:num)', 'TournamentSchedulerController::unpublish/$1');
+            $routes->get('export', 'TournamentSchedulerController::export');
             $routes->post('lock/(:num)', 'TournamentSchedulerController::lock/$1');
             $routes->post('unlock/(:num)', 'TournamentSchedulerController::unlock/$1');
             $routes->post('team-group', 'TournamentSchedulerController::moveTeam');
+        });
+
+        $routes->group('ai-scheduling', ['filter' => 'permission:tournaments.manage'], function ($routes) {
+            $routes->get('/', 'AiSchedulingController::index');
+            $routes->post('store', 'AiSchedulingController::store');
+            $routes->post('(:num)/run', 'AiSchedulingController::run/$1');
+        });
+
+        $routes->group('livestream', ['filter' => 'permission:tournaments.manage'], function ($routes) {
+            $routes->get('/', 'LivestreamController::index');
+            $routes->post('store', 'LivestreamController::store');
+            $routes->post('(:num)/status', 'LivestreamController::status/$1');
+        });
+
+        $routes->group('webhooks', ['filter' => 'permission:settings.view'], function ($routes) {
+            $routes->get('/', 'WebhookController::index');
+            $routes->post('store', 'WebhookController::store');
+            $routes->post('(:num)/status', 'WebhookController::status/$1');
+        });
+
+        $routes->group('integrations', ['filter' => 'permission:settings.view'], function ($routes) {
+            $routes->get('/', 'IntegrationsController::index');
+            $routes->post('keys', 'IntegrationsController::store');
+            $routes->post('keys/(:num)/revoke', 'IntegrationsController::revoke/$1');
+            $routes->post('health/(:num)', 'IntegrationsController::health/$1');
         });
 
         // POS routes (quầy bán hàng — yêu cầu quyền POS + gói có tính năng POS)
         $routes->group('pos', ['filter' => ['permission:pos.access', 'plan:pos']], function ($routes) {
             $routes->get('/', 'PosController::index');
             $routes->get('counter', 'PosController::index');
+            $routes->get('inventory', 'PosController::inventory');
+            $routes->get('inventory/history', 'PosController::inventoryHistory');
+            $routes->get('getStock/(:num)', 'PosController::getStock/$1');
+            $routes->post('importStock', 'PosController::importStock');
+            $routes->post('adjustStock', 'PosController::adjustStock');
             $routes->get('getOrder/(:num)', 'PosController::getOrder/$1');
             $routes->post('addItem/(:num)', 'PosController::addItem/$1');
             $routes->post('removeItem/(:num)/(:num)', 'PosController::removeItem/$1/$2');
@@ -571,6 +758,7 @@ $routes->group('player', ['namespace' => 'App\Controllers\Player'], function ($r
         $routes->post('(:num)/comment', 'CommunityController::comment/$1');
         $routes->post('(:num)/react', 'CommunityController::react/$1');
     });
+    $routes->get('livestream', 'LivestreamController::index');
     $routes->group('growth', function ($routes) {
         $routes->get('/', 'GrowthController::index');
         $routes->post('referral/apply', 'GrowthController::applyReferral');

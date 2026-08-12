@@ -179,7 +179,6 @@ class PlayersController extends BaseController
             'region'     => $this->request->getPost('region'),
             'home_branch_id' => $this->request->getPost('home_branch_id') ?: null,
             'level'      => $this->request->getPost('level'),
-            'rating_score' => (float) ($this->request->getPost('rating_score') ?: 0),
             'status'     => $this->request->getPost('status'),
             'updated_by' => user_id(),
         ];
@@ -334,7 +333,7 @@ class PlayersController extends BaseController
             return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
         }
 
-        $this->ratingService->recordMatch($player->tenant_id, $id, $this->request->getPost('opponent_player_id') ?: null, $this->request->getPost('result'), [
+        $matchId = $this->ratingService->recordMatch($player->tenant_id, $id, $this->request->getPost('opponent_player_id') ?: null, $this->request->getPost('result'), [
             'branch_id' => $this->request->getPost('branch_id') ?: null,
             'match_date' => $this->request->getPost('match_date'),
             'score' => $this->request->getPost('score'),
@@ -342,6 +341,10 @@ class PlayersController extends BaseController
             'notes' => $this->request->getPost('notes'),
             'created_by' => user_id(),
         ]);
+
+        if (! $matchId) {
+            return redirect()->back()->withInput()->with('error', 'Không thể ghi match. Rating canonical yêu cầu đối thủ hợp lệ và kết quả phải qua Unified Match Graph.');
+        }
 
         return redirect()->to('/admin/players/match-history/' . $id)->with('success', 'Match recorded successfully.');
     }

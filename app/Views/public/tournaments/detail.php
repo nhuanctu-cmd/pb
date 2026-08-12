@@ -1,65 +1,39 @@
-<!DOCTYPE html>
-<html lang="<?= esc($current_locale ?? 'vi') ?>">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= esc($pageTitle) ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css" rel="stylesheet">
-    <style>
-        body{background:#f7fafc;color:#132238}.hero{min-height:440px;background:#0f766e;color:white;display:flex;align-items:end}.hero.has-image{background-size:cover;background-position:center}.hero-shade{width:100%;background:linear-gradient(180deg,rgba(0,0,0,.08),rgba(0,0,0,.62));padding:120px 0 36px}.info-tile{border:1px solid #e2e8f0;border-radius:8px;background:white;padding:18px;height:100%}.sponsor-logo{width:72px;height:72px;object-fit:contain;border:1px solid #e5e7eb;border-radius:8px;background:white;padding:8px}
-    </style>
-</head>
-<body>
-<?php $shareUrl = current_url(); ?>
-<?php $heroImage = $tournament->banner ?: asset_url('assets/img/tournament-fallback.png'); ?>
-<header class="hero has-image" style="background-image:url('<?= esc($heroImage) ?>')">
-    <div class="hero-shade">
-        <div class="container">
-            <a href="/tournaments" class="btn btn-light btn-sm mb-3"><i class="bi bi-arrow-left"></i></a>
-            <h1 class="display-5 fw-bold"><?= esc($localized($tournament, 'name')) ?></h1>
-            <p class="lead mb-3"><?= esc($localized($tournament, 'description')) ?></p>
-            <div class="d-flex gap-2 flex-wrap">
-                <?php if ($tournament->status === 'open'): ?><a href="/tournaments/<?= esc($tournament->slug_vi) ?>/register" class="btn btn-success btn-lg"><?= esc(lang('Tournament.register')) ?></a><?php endif; ?>
-                <a class="btn btn-light" target="_blank" href="https://www.facebook.com/sharer/sharer.php?u=<?= urlencode($shareUrl) ?>"><i class="bi bi-facebook"></i> Facebook</a>
-                <a class="btn btn-light" target="_blank" href="https://zalo.me/share?u=<?= urlencode($shareUrl) ?>">Zalo</a>
-            </div>
-        </div>
-    </div>
-</header>
-<main class="container py-4">
-    <?= flash_message() ?>
-    <div class="row g-3 mb-4">
-        <div class="col-md-4"><div class="info-tile"><span class="text-muted"><?= esc(lang('Tournament.registration_open')) ?></span><h5><?= esc(format_datetime($tournament->registration_start)) ?></h5></div></div>
-        <div class="col-md-4"><div class="info-tile"><span class="text-muted"><?= esc(lang('Tournament.registration_closed')) ?></span><h5><?= esc(format_datetime($tournament->registration_end)) ?></h5></div></div>
-        <div class="col-md-4"><div class="info-tile"><span class="text-muted"><?= esc(lang('Tournament.fee')) ?></span><h5><?= format_money($tournament->registration_fee) ?></h5></div></div>
-    </div>
+<?php
+$locale = $current_locale ?? 'vi';
+$nameOf = static fn (object $row, string $field = 'name'): string => (string) (($locale === 'en' && ! empty($row->{$field . '_en'})) ? $row->{$field . '_en'} : ($row->{$field . '_vi'} ?? ''));
+$status = (string) ($tournament->status ?? 'open');
+$statusLabel = match ($status) { 'open' => 'Đang mở đăng ký', 'running' => 'Đang diễn ra', 'closed' => 'Đã đóng đăng ký', 'completed' => 'Đã kết thúc', 'cancelled' => 'Đã hủy', default => ucfirst($status) };
+$statusClass = match ($status) { 'open' => 'is-open', 'running' => 'is-live', 'completed' => 'is-complete', 'cancelled' => 'is-cancelled', default => 'is-closed' };
+$heroImage = $tournament->banner ?: asset_url('assets/img/tournament-fallback.png');
+$shareUrl = current_url();
+$matchStatusLabels = ['scheduled' => 'Lịch đấu', 'running' => 'Đang thi đấu', 'completed' => 'Đã xong', 'delayed' => 'Trì hoãn', 'cancelled' => 'Đã hủy'];
+$categoryTypeLabels = ['single_male' => 'Đơn nam', 'single_female' => 'Đơn nữ', 'double_male' => 'Đôi nam', 'double_female' => 'Đôi nữ', 'mixed_double' => 'Đôi nam nữ', 'team_battle' => 'Đồng đội'];
+?>
+<!doctype html>
+<html lang="<?= esc($locale) ?>">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title><?= esc($pageTitle) ?></title><meta name="description" content="<?= esc($localized($tournament, 'description')) ?>"><meta property="og:title" content="<?= esc($pageTitle) ?>"><meta property="og:image" content="<?= esc($heroImage) ?>"><link rel="stylesheet" href="<?= esc(asset_url('assets/css/tournament-public.css')) ?>"><link rel="stylesheet" href="<?= esc(asset_url('assets/css/tournament-detail-public.css')) ?>"></head>
+<body class="tournament-public-body">
+<header class="tp-header"><div class="tp-container tp-nav"><a class="tp-brand" href="/"><span class="tp-mark">NP</span><span><strong>NATIONAL</strong><small>PICKLEBALL RANKING</small></span></a><nav><a href="/ranking">BXH</a><a href="/players">VĐV</a><a class="is-active" href="/tournaments">Giải đấu</a><a href="/clubs">CLB</a><a href="/live">Live</a></nav><div class="tp-actions"><a href="/locale/switch/<?= $locale === 'vi' ? 'en' : 'vi' ?>"><?= $locale === 'vi' ? 'EN' : 'VI' ?></a><a class="tp-login" href="<?= session()->get('isLoggedIn') ? '/admin/dashboard' : '/login' ?>"><?= session()->get('isLoggedIn') ? 'Khu vực của tôi' : 'Đăng nhập' ?></a></div></div></header>
 
-    <section class="mb-4">
-        <h2 class="h4"><?= esc(lang('Tournament.categories')) ?></h2>
-        <div class="row g-3">
-            <?php foreach ($categories as $category): ?>
-                <div class="col-md-4"><div class="info-tile"><h3 class="h6"><?= esc($localized($category, 'name')) ?></h3><div class="text-muted"><?= esc($category->category_type) ?></div><strong><?= format_money($category->registration_fee) ?></strong></div></div>
-            <?php endforeach; ?>
+<main>
+    <section class="td-hero" style="--hero-image:url('<?= esc($heroImage) ?>')"><div class="td-hero-shade"></div><div class="tp-container td-hero-inner"><a class="td-back" href="/tournaments">← Tất cả giải đấu</a><div class="td-hero-copy"><div class="td-badges"><span class="td-status <?= esc($statusClass) ?>"><i></i><?= esc($statusLabel) ?></span><span><?= esc(strtoupper((string) ($tournament->verification_level ?? 'community'))) ?></span><?php if (! empty($tournament->tier_code)): ?><span><?= esc($tournament->tier_code) ?></span><?php endif; ?></div><h1><?= esc($localized($tournament, 'name')) ?></h1><p><?= esc($localized($tournament, 'description') ?: 'Thông tin chính thức, lịch thi đấu và kết quả của giải Pickleball.') ?></p><div class="td-hero-actions"><?php if ($status === 'open'): ?><a class="tp-button tp-button-orange" href="/tournaments/<?= esc($tournament->slug_vi) ?>/register">Đăng ký ngay <span>↗</span></a><?php endif; ?><?php if ($matches): ?><a class="td-light-button" href="/tournaments/<?= esc($tournament->slug_vi) ?>/live">Live / TV <span>↗</span></a><?php endif; ?><a class="td-share" target="_blank" href="https://www.facebook.com/sharer/sharer.php?u=<?= urlencode($shareUrl) ?>">Chia sẻ <span>↗</span></a></div></div></div></section>
+
+    <section class="tp-container td-overview"><div class="td-overview-grid"><div><span>THỜI GIAN THI ĐẤU</span><strong><?= esc($tournament->start_date ?? '—') ?> <small>→</small> <?= esc($tournament->end_date ?? '—') ?></strong><em><?= esc($tournament->branch_name ?? 'Địa điểm đang cập nhật') ?></em></div><div><span>ĐĂNG KÝ</span><strong><?= number_format((int) ($confirmed_total ?? 0)) ?> <small>/ <?= esc($tournament->max_teams ?: '∞') ?></small></strong><em><?= $tournament->registration_end ? 'Đóng ' . esc(format_datetime($tournament->registration_end)) : 'Đang cập nhật hạn đăng ký' ?></em></div><div><span>TRẬN ĐẤU</span><strong><?= number_format(count($matches ?? [])) ?> <small>trận</small></strong><em><?= number_format((int) ($live_total ?? 0)) ?> trận đang diễn ra</em></div><div><span>PHÍ THAM DỰ TỪ</span><strong><?= format_money($tournament->registration_fee) ?></strong><em>Hạng mục có thể có mức phí riêng</em></div></div></section>
+
+    <section class="tp-container td-body"><div class="td-main"><div class="td-section-head"><div><span class="tp-eyebrow">01 / CATEGORIES</span><h2>Hạng mục <em>thi đấu</em></h2></div><?php if ($status === 'open'): ?><a class="td-inline-cta" href="/tournaments/<?= esc($tournament->slug_vi) ?>/register">Chọn hạng mục <span>↗</span></a><?php endif; ?></div><?php if ($categories): ?><div class="td-category-grid"><?php foreach ($categories as $category): ?><article class="td-category"><div class="td-category-top"><span class="td-category-icon"><?= esc($categoryTypeLabels[$category->category_type] ?? strtoupper((string) $category->category_type)) ?></span><span class="td-category-fee"><?= format_money($category->registration_fee) ?></span></div><h3><?= esc($localized($category, 'name')) ?></h3><p><?= esc($category->discipline ?: 'pickleball') ?> · <?= esc($category->age_category ?: 'open') ?> · <?= esc($category->gender_category ?: 'all') ?></p><?php if ($category->min_rating || $category->max_rating): ?><small>Rating: <?= esc($category->min_rating ?: '—') ?> — <?= esc($category->max_rating ?: '—') ?></small><?php endif; ?><div class="td-capacity"><div><span><?= number_format((int) ($category->confirmed_count ?? 0)) ?> đã xác nhận</span><b><?= $category->capacity ? number_format((int) $category->capacity) . ' suất' : 'Không giới hạn' ?></b></div><i><b style="width:<?= (int) ($category->fill_percent ?? 0) ?>%"></b></i></div></article><?php endforeach; ?></div><?php else: ?><div class="td-empty">Hạng mục đang được cập nhật.</div><?php endif; ?>
+
+        <div class="td-section-head td-schedule-head"><div><span class="tp-eyebrow">02 / SCHEDULE & RESULTS</span><h2>Lịch sân <em>và kết quả</em></h2></div><?php if ($matches): ?><a class="td-inline-cta" href="/tournaments/<?= esc($tournament->slug_vi) ?>/live">Mở live board <span>↗</span></a><?php endif; ?></div><div class="td-match-summary"><?php foreach (['scheduled' => 'Lịch đấu', 'running' => 'Đang chơi', 'completed' => 'Đã xong', 'delayed' => 'Trì hoãn'] as $key => $label): ?><span><b><?= (int) (($match_status ?? [])[$key] ?? 0) ?></b><?= $label ?></span><?php endforeach; ?></div><?php if ($matches): ?><div class="td-schedule-table"><div class="td-schedule-head-row"><span>TRẬN</span><span>THỜI GIAN / SÂN</span><span>ĐỘI THI ĐẤU</span><span>TRẠNG THÁI</span></div><?php foreach ($matches as $match): ?><div class="td-match-row"><span class="td-match-no">#<?= esc($match->match_no) ?><small><?= esc($match->round_name) ?></small></span><span class="td-match-time"><b><?= esc($match->scheduled_date ?: 'TBA') ?></b><small><?= esc($match->start_time ? substr((string) $match->start_time, 0, 5) : '—') ?> · <?= esc($match->court_name ?: $match->court_code ?: 'Sân TBA') ?></small></span><span class="td-match-teams"><strong><?= esc($match->team_a_name ?: 'Chờ đội xác nhận') ?></strong><em>vs</em><strong><?= esc($match->team_b_name ?: 'Chờ đội xác nhận') ?></strong></span><span class="td-match-status <?= in_array($match->status, ['running', 'in_progress', 'on_court'], true) ? 'is-live' : '' ?>"><i></i><?= esc($matchStatusLabels[$match->status] ?? $match->status) ?></span></div><?php endforeach; ?></div><?php else: ?><div class="td-empty">Lịch thi đấu sẽ hiển thị sau khi ban tổ chức công bố draw.</div><?php endif; ?>
+
+        <?php if ($teams): ?><div class="td-section-head td-team-head"><div><span class="tp-eyebrow">03 / COMPETITORS</span><h2>Đội thi đấu <em>đã công bố</em></h2></div></div><div class="td-team-grid"><?php foreach ($teams as $team): ?><div class="td-team"><span><?= esc(mb_strtoupper(mb_substr((string) $team->team_name, 0, 1))) ?></span><div><strong><?= esc($team->team_name) ?></strong><small><?= esc($team->platform_club_name ?: 'Đội độc lập') ?></small></div><b><?= $team->rating_avg ? number_format((float) $team->rating_avg, 2) : '—' ?></b></div><?php endforeach; ?></div><?php endif; ?>
+
+        <div class="td-section-head td-rule-head"><div><span class="tp-eyebrow">04 / RULES & GOVERNANCE</span><h2>Điều lệ <em>giải đấu</em></h2></div></div><div class="td-rule-box"><?= nl2br(esc($localized($rule ?? (object) [], 'rule_content') ?: 'Điều lệ chi tiết sẽ được ban tổ chức cập nhật trên trang này.')) ?></div>
+        <?php if ($sponsors): ?><div class="td-section-head td-sponsor-head"><div><span class="tp-eyebrow">05 / PARTNERS</span><h2>Đơn vị <em>đồng hành</em></h2></div></div><div class="td-sponsors"><?php foreach ($sponsors as $sponsor): ?><a href="<?= esc($sponsor->website ?: '#') ?>" <?= $sponsor->website ? 'target="_blank" rel="noopener"' : '' ?>><?php if ($sponsor->logo): ?><img src="<?= esc($sponsor->logo) ?>" alt="<?= esc($sponsor->sponsor_name) ?>"><?php endif; ?><strong><?= esc($sponsor->sponsor_name) ?></strong></a><?php endforeach; ?></div><?php endif; ?>
         </div>
+        <aside class="td-aside"><div class="td-action-card"><span class="tp-eyebrow">JOIN THIS EVENT</span><h3><?= $status === 'open' ? 'Sẵn sàng vào sân?' : esc($statusLabel) ?></h3><p><?= $status === 'open' ? 'Chọn hạng mục phù hợp và gửi thông tin đăng ký. Ban tổ chức sẽ xử lý eligibility trước khi xác nhận.' : 'Theo dõi lịch đấu, kết quả và các cập nhật mới nhất của giải.' ?></p><?php if ($status === 'open'): ?><a class="tp-button tp-button-orange" href="/tournaments/<?= esc($tournament->slug_vi) ?>/register">Đăng ký tham dự <span>↗</span></a><?php endif; ?><a class="td-action-secondary" href="/tournaments/<?= esc($tournament->slug_vi) ?>/live">Xem live / schedule <span>↗</span></a></div><div class="td-info-card"><span class="tp-eyebrow">VENUE</span><h3><?= esc($tournament->branch_name ?? 'Địa điểm đang cập nhật') ?></h3><p><?= esc($tournament->branch_address ?? 'Địa chỉ và hướng dẫn di chuyển sẽ được cập nhật.') ?></p><a href="/calendar">Xem lịch sân <span>↗</span></a></div><div class="td-info-card"><span class="tp-eyebrow">REGISTRATION WINDOW</span><p><b>Mở từ</b><br><?= esc(format_datetime($tournament->registration_start)) ?></p><p><b>Đóng lúc</b><br><?= esc(format_datetime($tournament->registration_end)) ?></p></div></aside>
     </section>
 
-    <section class="mb-4">
-        <h2 class="h4"><?= esc(lang('Tournament.rules')) ?></h2>
-        <div class="info-tile" style="white-space:pre-wrap"><?= esc($localized($rule ?? (object) [], 'rule_content') ?: '-') ?></div>
-    </section>
-
-    <section>
-        <h2 class="h4"><?= esc(lang('Tournament.sponsors')) ?></h2>
-        <div class="d-flex gap-3 flex-wrap">
-            <?php foreach ($sponsors as $sponsor): ?>
-                <a href="<?= esc($sponsor->website ?: '#') ?>" class="text-decoration-none text-dark d-flex align-items-center gap-2">
-                    <?php if ($sponsor->logo): ?><img class="sponsor-logo" src="<?= esc($sponsor->logo) ?>" alt="<?= esc($sponsor->sponsor_name) ?>"><?php endif; ?>
-                    <strong><?= esc($sponsor->sponsor_name) ?></strong>
-                </a>
-            <?php endforeach; ?>
-        </div>
-    </section>
+    <?php if ($related): ?><section class="tp-container td-related"><div class="td-section-head"><div><span class="tp-eyebrow">MORE FROM THE CALENDAR</span><h2>Giải đấu <em>liên quan</em></h2></div><a class="td-inline-cta" href="/tournaments">Xem tất cả <span>↗</span></a></div><div class="td-related-grid"><?php foreach ($related as $item): ?><a href="/tournaments/<?= esc($item->slug_vi) ?>"><span><?= esc($item->start_date ?? 'TBA') ?></span><strong><?= esc($nameOf($item)) ?></strong><small><?= esc($item->status) ?> · <?= esc($item->branch_name ?? 'Địa điểm TBA') ?></small><b>↗</b></a><?php endforeach; ?></div></section><?php endif; ?>
 </main>
+<footer class="tp-footer"><div class="tp-container"><div class="tp-footer-main"><a class="tp-brand tp-brand-white" href="/"><span class="tp-mark">NP</span><span><strong>NATIONAL</strong><small>PICKLEBALL RANKING</small></span></a><div><a href="/ranking">BXH</a><a href="/players">VĐV</a><a href="/clubs">CLB</a><a href="/verify">Xác minh</a></div></div><div class="tp-footer-bottom"><span>© <?= date('Y') ?> National Pickleball Ranking</span><span>Dữ liệu công khai · Versioned competition records</span></div></div></footer>
 </body>
 </html>

@@ -40,7 +40,7 @@ class PosOrderModel extends Model
 
     public function getWithDetails(int $orderId)
     {
-        return $this->select('pos_orders.*, users.fullname as staff_name')
+        return $this->select("pos_orders.*, CONCAT_WS(' ', users.first_name, users.last_name) AS staff_name")
             ->join('users', 'users.id = pos_orders.created_by', 'left')
             ->where('pos_orders.id', $orderId)
             ->first();

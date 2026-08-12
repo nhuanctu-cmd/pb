@@ -13,7 +13,7 @@ class PlayerModel extends Model
     protected $useSoftDeletes   = true;
     protected $protectFields    = true;
     protected $allowedFields    = [
-        'tenant_id', 'user_id', 'player_code', 'full_name', 'phone', 'email',
+        'tenant_id', 'user_id', 'player_code', 'full_name', 'phone', 'email', 'country_code',
         'gender', 'birthday', 'avatar', 'region', 'home_branch_id', 'level_id',
         'level', 'rating_score', 'checkin_streak', 'best_checkin_streak',
         'last_checkin_date', 'mvp_count', 'status',

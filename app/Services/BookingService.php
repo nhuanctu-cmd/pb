@@ -16,6 +16,7 @@ class BookingService
     protected BookingQrCodeModel $bookingQrCodeModel;
     protected BookingLogModel $bookingLogModel;
     protected CourtModel $courtModel;
+    protected CustomerService $customerService;
     protected PricingService $pricingService;
     protected BookingStateMachine $stateMachine;
 
@@ -26,6 +27,7 @@ class BookingService
         $this->bookingQrCodeModel = model(BookingQrCodeModel::class);
         $this->bookingLogModel   = model(BookingLogModel::class);
         $this->courtModel        = model(CourtModel::class);
+        $this->customerService   = new CustomerService();
         $this->pricingService    = new PricingService();
         $this->stateMachine      = new BookingStateMachine();
     }
@@ -56,6 +58,15 @@ class BookingService
         if (!empty($data['player_id']) && !(new PlayerModel())->findPlayerByUser((int) $data['player_id'], $tenantId)) {
             $db->transRollback();
             return ['success' => false, 'message' => 'Player không thuộc tenant hiện tại.'];
+        }
+        $customerId = null;
+        if ($this->customerService->available()) {
+            $customer = $this->customerService->resolveForBooking($tenantId, $data, (int) ($data['created_by'] ?? 0));
+            if (! $customer['success']) {
+                $db->transRollback();
+                return $customer;
+            }
+            $customerId = $customer['customer_id'] ?? null;
         }
         $requestedIntervals = [];
 
@@ -119,6 +130,7 @@ class BookingService
             'tenant_id'       => $tenantId,
             'branch_id'       => $branchId,
             'player_id'       => $data['player_id'] ?? null,
+            'customer_id'     => $customerId,
             'customer_name'   => $data['customer_name'],
             'customer_phone'  => $data['customer_phone'],
             'customer_email'  => $data['customer_email'] ?? null,
@@ -223,6 +235,11 @@ class BookingService
             'price_breakdown' => json_encode($priceBreakdown, JSON_UNESCAPED_UNICODE),
         ]);
 
+        if ($customerId && ! $this->customerService->recordBooking($customerId, $tenantId, (int) $bookingId, ['total_amount' => $netAmount], (int) ($data['created_by'] ?? 0))) {
+            $db->transRollback();
+            return ['success' => false, 'message' => 'Không thể ghi timeline khách hàng.'];
+        }
+
         // Generate QR code
         $this->generateQrCode($tenantId, $bookingId);
 
@@ -244,6 +261,22 @@ class BookingService
         }
 
         $booking = $this->bookingModel->find($bookingId);
+
+        // Delivery is asynchronous and must never make a committed booking fail.
+        try {
+            service('webhookService')->dispatch($tenantId, 'booking.created', [
+                'id' => (int) $bookingId,
+                'tenant_id' => $tenantId,
+                'booking_code' => (string) ($booking->booking_code ?? ''),
+                'booking_date' => (string) ($booking->booking_date ?? ''),
+                'start_time' => (string) ($booking->start_time ?? ''),
+                'end_time' => (string) ($booking->end_time ?? ''),
+                'status' => (string) ($booking->status ?? ''),
+                'occurred_at' => date('c'),
+            ]);
+        } catch (\Throwable $exception) {
+            log_message('error', 'booking.created webhook dispatch failed: ' . $exception->getMessage());
+        }
 
         return [
             'success'  => true,
@@ -759,7 +792,9 @@ class BookingService
 
     protected function validateCourtBookable(int $courtId, int $tenantId, int $branchId, string $date, string $startTime, string $endTime): array
     {
-        $court = $this->courtModel->find($courtId);
+        $courtQuery = $this->courtModel->where('id', $courtId)->where('deleted_at', null);
+        if ($tenantId !== null) $courtQuery->where('tenant_id', $tenantId);
+        $court = $courtQuery->first();
         if (! $court) {
             return ['success' => false, 'message' => 'Không tìm thấy sân.'];
         }
@@ -924,6 +959,7 @@ class BookingService
             ->select('booking_items.start_time, booking_items.end_time')
             ->join('bookings', 'bookings.id = booking_items.booking_id')
             ->where('booking_items.court_id', $courtId)
+            ->where('bookings.tenant_id', (int) $court->tenant_id)
             ->where('bookings.booking_date', $date)
             ->where('bookings.deleted_at', null)
             ->whereIn('bookings.status', [
@@ -998,18 +1034,16 @@ class BookingService
         }
 
         $week = $week->modify('monday this week');
-        $courts = $this->courtModel
+        $courtsQuery = $this->courtModel
             ->where('branch_id', $branchId)
             ->where('deleted_at', null)
-            ->where('status !=', 'inactive')
-            ->orderBy('floor', 'ASC')
-            ->orderBy('sort_order', 'ASC')
-            ->orderBy('code', 'ASC')
-            ->findAll();
+            ->where('status !=', 'inactive');
+        if ($tenantId !== null) $courtsQuery->where('tenant_id', $tenantId);
+        $courts = $courtsQuery->orderBy('floor', 'ASC')->orderBy('sort_order', 'ASC')->orderBy('code', 'ASC')->findAll();
 
-        if ($tenantId !== null) {
-            $courts = array_values(array_filter($courts, static fn ($court) => (int) $court->tenant_id === $tenantId));
-        }
+        // Tenant is already validated by AvailabilityService; keep this
+        // fallback filter for direct legacy callers.
+        if ($tenantId !== null) $courts = array_values(array_filter($courts, static fn ($court) => (int) $court->tenant_id === $tenantId));
 
         $courtData = [];
         foreach ($courts as $index => $court) {

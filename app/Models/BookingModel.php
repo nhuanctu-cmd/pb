@@ -13,7 +13,7 @@ class BookingModel extends Model
     protected $useSoftDeletes   = true;
     protected $protectFields    = true;
     protected $allowedFields    = [
-        'tenant_id', 'facility_id', 'branch_id', 'player_id',
+        'tenant_id', 'facility_id', 'branch_id', 'player_id', 'customer_id',
         'customer_name', 'customer_phone', 'customer_email',
         'booking_code', 'booking_date', 'start_time', 'end_time',
         'duration_minutes', 'total_amount', 'deposit_amount', 'paid_amount',

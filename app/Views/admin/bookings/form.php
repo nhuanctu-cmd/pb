@@ -7,9 +7,9 @@
         <section class="erp-form-section">
             <div class="erp-form-section-header"><h2>Thông tin khách</h2></div>
             <div class="erp-form-section-body erp-form-grid">
-                <div class="erp-field"><label>Tên khách <span class="erp-required">*</span></label><input name="customer_name" class="erp-control" required></div>
-                <div class="erp-field"><label>Số điện thoại <span class="erp-required">*</span></label><input name="customer_phone" class="erp-control" required></div>
-                <div class="erp-field"><label>Email</label><input type="email" name="customer_email" class="erp-control"></div>
+                <div class="erp-field"><label>Tên khách <span class="erp-required">*</span></label><input name="customer_name" class="erp-control" value="<?= esc(set_value('customer_name', $prefill['customer_name'] ?? '')) ?>" required></div>
+                <div class="erp-field"><label>Số điện thoại <span class="erp-required">*</span></label><input name="customer_phone" class="erp-control" value="<?= esc(set_value('customer_phone', $prefill['customer_phone'] ?? '')) ?>" required></div>
+                <div class="erp-field"><label>Email</label><input type="email" name="customer_email" class="erp-control" value="<?= esc(set_value('customer_email', $prefill['customer_email'] ?? '')) ?>"></div>
                 <div class="erp-field"><label>Nguồn</label><input class="erp-control" value="Admin" disabled></div>
             </div>
         </section>

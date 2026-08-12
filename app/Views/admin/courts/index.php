@@ -12,6 +12,7 @@ $total = count($courtsFlat);
 $available = count(array_filter($courtsFlat, fn ($c) => $c->status === 'available'));
 $maintenance = count(array_filter($courtsFlat, fn ($c) => $c->status === 'maintenance'));
 $active = count(array_filter($courtsFlat, fn ($c) => in_array($c->status, ['available', 'occupied'], true)));
+$clubOptions = implode('', array_map(fn ($club) => '<option value="' . $club->id . '" ' . ((string) ($filters['club_id'] ?? '') === (string) $club->id ? 'selected' : '') . '>' . esc($club->name_vi) . '</option>', $clubs ?? []));
 ?>
 
 <div class="erp-action-bar">
@@ -46,6 +47,10 @@ $active = count(array_filter($courtsFlat, fn ($c) => in_array($c->status, ['avai
         <option value="maintenance">Bảo trì</option>
         <option value="inactive">Ngưng dùng</option>
     </select>
+    <select class="erp-select" style="width:210px" name="club_id" onchange="const u=new URL(window.location); u.searchParams.set(&quot;club_id&quot;, this.value); if (!this.value) u.searchParams.delete(&quot;club_id&quot;); location.href=u.toString();">
+        <option value="">Tất cả CLB</option>
+        ' . $clubOptions . '
+    </select>
 ']) ?>
 
 <div class="erp-table-toolbar">
@@ -76,6 +81,7 @@ $active = count(array_filter($courtsFlat, fn ($c) => in_array($c->status, ['avai
                                     <?= renderStatusBadge($court->status, 'court') ?>
                                 </div>
                                 <div class="erp-info-list mb-3">
+                                    <div class="erp-info-row"><span>CLB</span><strong><?= esc($court->club_name_vi ?? 'Chưa gán') ?></strong></div>
                                     <div class="erp-info-row"><span>Không gian</span><strong><?= $court->is_indoor ? 'Trong nhà' : 'Ngoài trời' ?></strong></div>
                                     <div class="erp-info-row"><span>Diện tích</span><strong><?= esc($court->area ?: '—') ?> m²</strong></div>
                                     <div class="erp-info-row"><span>Tiện ích</span><strong><?= $court->has_light ? 'Đèn ' : '' ?><?= $court->has_fan ? 'Quạt ' : '' ?><?= $court->has_camera ? 'Camera' : '' ?></strong></div>
@@ -97,12 +103,13 @@ $active = count(array_filter($courtsFlat, fn ($c) => in_array($c->status, ['avai
 
     <div class="erp-table-wrap mt-3">
         <table class="erp-table">
-            <thead><tr><th>Mã sân</th><th>Tên sân</th><th>Loại</th><th>Tầng</th><th>Tiện ích</th><th>Trạng thái</th><th class="col-actions">Action</th></tr></thead>
+            <thead><tr><th>Mã sân</th><th>Tên sân</th><th>CLB</th><th>Loại</th><th>Tầng</th><th>Tiện ích</th><th>Trạng thái</th><th class="col-actions">Action</th></tr></thead>
             <tbody>
             <?php foreach ($courtsFlat as $court): ?>
                 <tr>
                     <td><strong><?= esc($court->code) ?></strong></td>
                     <td><?= esc($court->getName()) ?></td>
+                    <td><?= esc($court->club_name_vi ?? 'Chưa gán') ?></td>
                     <td><?= esc($court->court_type_name_vi ?? '-') ?></td>
                     <td><?= esc($court->floor ?? 1) ?></td>
                     <td><?= $court->has_light ? 'Đèn ' : '' ?><?= $court->has_fan ? 'Quạt ' : '' ?><?= $court->has_camera ? 'Camera' : '' ?></td>

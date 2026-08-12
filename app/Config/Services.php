@@ -71,6 +71,24 @@ class Services extends CoreServices
         return new \App\Services\BookingService();
     }
 
+    public static function availabilityService(bool $getShared = true): \App\Services\AvailabilityService
+    {
+        if ($getShared) return static::getSharedInstance('availabilityService');
+        return new \App\Services\AvailabilityService();
+    }
+
+    public static function dataQualityService(bool $getShared = true): \App\Services\DataQualityService
+    {
+        if ($getShared) return static::getSharedInstance('dataQualityService');
+        return new \App\Services\DataQualityService();
+    }
+
+    public static function queueMonitorService(bool $getShared = true): \App\Services\QueueMonitorService
+    {
+        if ($getShared) return static::getSharedInstance('queueMonitorService');
+        return new \App\Services\QueueMonitorService();
+    }
+
     public static function recurringBookingService(bool $getShared = true): \App\Services\RecurringBookingService
     {
         if ($getShared) {
@@ -163,6 +181,72 @@ class Services extends CoreServices
         return new \App\Services\AiSchedulingService();
     }
 
+    public static function livestreamService(bool $getShared = true): \App\Services\LivestreamService
+    {
+        if ($getShared) return static::getSharedInstance('livestreamService');
+        return new \App\Services\LivestreamService();
+    }
+
+    public static function webhookService(bool $getShared = true): \App\Services\WebhookService
+    {
+        if ($getShared) return static::getSharedInstance('webhookService');
+        return new \App\Services\WebhookService();
+    }
+
+    public static function partnerApiService(bool $getShared = true): \App\Services\PartnerApiService
+    {
+        if ($getShared) return static::getSharedInstance('partnerApiService');
+        return new \App\Services\PartnerApiService();
+    }
+
+    public static function playerPassportService(bool $getShared = true): \App\Services\PlayerPassportService
+    {
+        if ($getShared) return static::getSharedInstance('playerPassportService');
+        return new \App\Services\PlayerPassportService();
+    }
+
+    public static function internationalFoundationService(bool $getShared = true): \App\Services\InternationalFoundationService
+    {
+        if ($getShared) return static::getSharedInstance('internationalFoundationService');
+        return new \App\Services\InternationalFoundationService();
+    }
+
+    public static function tenantDataPolicy(bool $getShared = true): \App\Services\TenantDataPolicy
+    {
+        if ($getShared) return static::getSharedInstance('tenantDataPolicy');
+        return new \App\Services\TenantDataPolicy();
+    }
+
+    public static function ratingNetworkService(bool $getShared = true): \App\Services\RatingNetworkService
+    {
+        if ($getShared) return static::getSharedInstance('ratingNetworkService');
+        return new \App\Services\RatingNetworkService();
+    }
+
+    public static function rankingNetworkService(bool $getShared = true): \App\Services\RankingNetworkService
+    {
+        if ($getShared) return static::getSharedInstance('rankingNetworkService');
+        return new \App\Services\RankingNetworkService();
+    }
+
+    public static function tournamentMatchNetworkAdapter(bool $getShared = true): \App\Services\TournamentMatchNetworkAdapter
+    {
+        if ($getShared) return static::getSharedInstance('tournamentMatchNetworkAdapter');
+        return new \App\Services\TournamentMatchNetworkAdapter();
+    }
+
+    public static function platformClubService(bool $getShared = true): \App\Services\PlatformClubService
+    {
+        if ($getShared) return static::getSharedInstance('platformClubService');
+        return new \App\Services\PlatformClubService();
+    }
+
+    public static function matchGovernanceService(bool $getShared = true): \App\Services\MatchGovernanceService
+    {
+        if ($getShared) return static::getSharedInstance('matchGovernanceService');
+        return new \App\Services\MatchGovernanceService();
+    }
+
     public static function growthService(bool $getShared = true): \App\Services\GrowthService
     {
         if ($getShared) {
@@ -201,6 +285,132 @@ class Services extends CoreServices
             return static::getSharedInstance('liveScoreService');
         }
         return new \App\Services\LiveScoreService();
+    }
+
+    public static function publicPortalService(bool $getShared = true): \App\Services\PublicPortalService
+    {
+        if ($getShared) return static::getSharedInstance('publicPortalService');
+        return new \App\Services\PublicPortalService();
+    }
+
+    public static function ratingEngine(bool $getShared = true): \App\Services\RatingEngine
+    {
+        if ($getShared) return static::getSharedInstance('ratingEngine');
+        return new \App\Services\RatingEngine();
+    }
+
+    public static function ratingCalculator(bool $getShared = true): \App\Services\RatingCalculator
+    {
+        if ($getShared) return static::getSharedInstance('ratingCalculator');
+        return new \App\Services\RatingCalculator(new \App\Services\ExpectedPerformanceCalculator(), new \App\Services\MatchPerformanceService(), new \App\Services\AverageTeamRatingStrategy());
+    }
+
+    public static function ratingEligibilityService(bool $getShared = true): \App\Services\RatingEligibilityService
+    {
+        if ($getShared) return static::getSharedInstance('ratingEligibilityService');
+        return new \App\Services\RatingEligibilityService();
+    }
+
+    public static function ratingReliabilityEngine(bool $getShared = true): \App\Services\RatingReliabilityEngine
+    {
+        if ($getShared) return static::getSharedInstance('ratingReliabilityEngine');
+        return new \App\Services\RatingReliabilityEngine();
+    }
+
+    public static function skillBandResolver(bool $getShared = true): \App\Services\SkillBandResolver
+    {
+        if ($getShared) return static::getSharedInstance('skillBandResolver');
+        return new \App\Services\SkillBandResolver();
+    }
+
+    public static function initialRatingService(bool $getShared = true): \App\Services\InitialRatingService
+    {
+        if ($getShared) return static::getSharedInstance('initialRatingService');
+        return new \App\Services\InitialRatingService();
+    }
+
+    public static function skillAssessmentService(bool $getShared = true): \App\Services\SkillAssessmentService
+    {
+        if ($getShared) return static::getSharedInstance('skillAssessmentService');
+        return new \App\Services\SkillAssessmentService();
+    }
+
+    public static function playerSkillClaimService(bool $getShared = true): \App\Services\PlayerSkillClaimService
+    {
+        if ($getShared) return static::getSharedInstance('playerSkillClaimService');
+        return new \App\Services\PlayerSkillClaimService();
+    }
+
+    public static function tournamentEligibilityService(bool $getShared = true): \App\Services\TournamentEligibilityService
+    {
+        if ($getShared) return static::getSharedInstance('tournamentEligibilityService');
+        return new \App\Services\TournamentEligibilityService();
+    }
+
+    public static function ratingRebuildService(bool $getShared = true): \App\Services\RatingRebuildService
+    {
+        if ($getShared) return static::getSharedInstance('ratingRebuildService');
+        return new \App\Services\RatingRebuildService();
+    }
+
+    public static function rankingRebuildService(bool $getShared = true): \App\Services\RankingRebuildService
+    {
+        if ($getShared) return static::getSharedInstance('rankingRebuildService');
+        return new \App\Services\RankingRebuildService();
+    }
+
+    public static function ratingIntegrityService(bool $getShared = true): \App\Services\RatingIntegrityService
+    {
+        if ($getShared) return static::getSharedInstance('ratingIntegrityService');
+        return new \App\Services\RatingIntegrityService();
+    }
+
+    public static function ratingImportService(bool $getShared = true): \App\Services\RatingImportService
+    {
+        if ($getShared) return static::getSharedInstance('ratingImportService');
+        return new \App\Services\RatingImportService();
+    }
+
+    public static function provenanceService(bool $getShared = true): \App\Services\ProvenanceService
+    {
+        if ($getShared) return static::getSharedInstance('provenanceService');
+        return new \App\Services\ProvenanceService();
+    }
+
+    public static function rulesetService(bool $getShared = true): \App\Services\RulesetService
+    {
+        if ($getShared) return static::getSharedInstance('rulesetService');
+        return new \App\Services\RulesetService();
+    }
+
+    public static function governanceService(bool $getShared = true): \App\Services\GovernanceService
+    {
+        if ($getShared) return static::getSharedInstance('governanceService');
+        return new \App\Services\GovernanceService();
+    }
+
+    public static function providerRatingService(bool $getShared = true): \App\Services\ProviderRatingService
+    {
+        if ($getShared) return static::getSharedInstance('providerRatingService');
+        return new \App\Services\ProviderRatingService();
+    }
+
+    public static function resultCorrectionService(bool $getShared = true): \App\Services\ResultCorrectionService
+    {
+        if ($getShared) return static::getSharedInstance('resultCorrectionService');
+        return new \App\Services\ResultCorrectionService();
+    }
+
+    public static function externalRatingProviderAdapter(bool $getShared = true): \App\Services\ExternalRatingProviderAdapter
+    {
+        if ($getShared) return static::getSharedInstance('externalRatingProviderAdapter');
+        return new \App\Services\ExternalRatingProviderAdapter();
+    }
+
+    public static function ratingAdjustmentService(bool $getShared = true): \App\Services\RatingAdjustmentService
+    {
+        if ($getShared) return static::getSharedInstance('ratingAdjustmentService');
+        return new \App\Services\RatingAdjustmentService();
     }
 
     public static function tournamentService(bool $getShared = true): \App\Services\TournamentService

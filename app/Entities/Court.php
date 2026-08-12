@@ -12,6 +12,8 @@ class Court extends Entity
         'id'            => 'int',
         'tenant_id'     => 'int',
         'branch_id'     => 'int',
+        'facility_id'   => 'int',
+        'club_id'       => 'int',
         'court_type_id' => 'int',
         'floor'         => 'int',
         'area'          => 'float',

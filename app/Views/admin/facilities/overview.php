@@ -21,6 +21,13 @@
             <h4><?= esc($facility->total_courts ?? 0) ?></h4>
         </div></div>
     </div>
+    <div class="col-md-4">
+        <div class="card"><div class="card-body">
+            <div class="text-muted">CLB vận hành</div>
+            <h4><?= count($facilityClubs ?? []) ?></h4>
+            <a href="/admin/facilities/clubs/<?= (int) $facility->id ?>" class="btn btn-sm btn-outline-success"><i class="bi bi-building-heart"></i> Quản lý CLB</a>
+        </div></div>
+    </div>
 </div>
 
 <div class="card">

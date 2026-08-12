@@ -32,6 +32,10 @@ class FacilitiesController extends BaseController
         $this->viewData['facilities'] = $tenantId
             ? $this->facilityModel->getByTenant($tenantId, $this->request->getGet())
             : [];
+        $this->viewData['facilityClubs'] = [];
+        foreach ($this->viewData['facilities'] as $facility) {
+            $this->viewData['facilityClubs'][(int) $facility->id] = $this->facilityService->getFacilityClubs((int) $facility->id, (int) $tenantId);
+        }
 
         return $this->render('admin/facilities/index', $this->viewData);
     }
@@ -142,6 +146,7 @@ class FacilitiesController extends BaseController
             'pageTitle' => 'Facility Dashboard',
             'facility'  => $facility,
             'branches'  => $dashboard['branches'] ?? [],
+            'facilityClubs' => $this->facilityService->getFacilityClubs($id, (int) current_tenant_id()),
             'dashboard' => $dashboard,
         ]);
     }
@@ -149,6 +154,40 @@ class FacilitiesController extends BaseController
     public function branches(int $id)
     {
         return $this->dashboard($id);
+    }
+
+    public function clubs(int $id)
+    {
+        $tenantId = (int) current_tenant_id();
+        $facility = $tenantId ? $this->facilityModel->findForTenant($id, $tenantId) : null;
+        if (! $facility) return redirect()->to('/admin/facilities')->with('error', lang('App.no_data'));
+
+        return $this->render('admin/facilities/clubs', [
+            'pageTitle' => 'CLB thuộc cụm sân',
+            'facility' => $facility,
+            'assignedClubs' => $this->facilityService->getFacilityClubs($id, $tenantId, false),
+            'clubs' => $this->facilityService->getTenantClubs($tenantId),
+        ]);
+    }
+
+    public function assignClub(int $id)
+    {
+        $tenantId = (int) current_tenant_id();
+        $result = $this->facilityService->assignClubToFacility(
+            $id,
+            (int) $this->request->getPost('club_id'),
+            $tenantId,
+            (int) user_id(),
+            (bool) $this->request->getPost('is_primary'),
+            trim((string) $this->request->getPost('notes')) ?: null
+        );
+        return redirect()->back()->with($result['success'] ? 'success' : 'error', $result['message']);
+    }
+
+    public function removeClub(int $facilityId, int $assignmentId)
+    {
+        $ok = $this->facilityService->removeClubFromFacility($assignmentId, (int) current_tenant_id(), (int) user_id());
+        return redirect()->to('/admin/facilities/clubs/' . $facilityId)->with($ok ? 'success' : 'error', $ok ? 'Đã bỏ gán CLB khỏi cụm sân.' : 'Không thể bỏ gán CLB.');
     }
 
     public function courtGrid(int $branchId)

@@ -191,18 +191,10 @@ if (!function_exists('generate_code')) {
 if (!function_exists('is_active_route')) {
     function is_active_route(string $segment, string $className = 'active'): string
     {
-        $uri = service('uri');
-        $firstSegment = $uri->getSegment(1);
-        $secondSegment = $uri->getSegment(2);
+        $current = trim((string) service('uri')->getPath(), '/');
+        $target = trim($segment, '/');
 
-        if (strpos($segment, '/') !== false) {
-            $parts = explode('/', $segment);
-            if ($firstSegment === ($parts[0] ?? '') && $secondSegment === ($parts[1] ?? '')) {
-                return $className;
-            }
-        }
-
-        if ($firstSegment === $segment) {
+        if ($current === $target || ($target !== '' && str_starts_with($current, $target . '/'))) {
             return $className;
         }
 
@@ -302,8 +294,13 @@ if (!function_exists('asset_url')) {
         $scriptName = preg_replace('#/+#', '/', $scriptName) ?: '';
         $basePath = str_replace('\\', '/', dirname($scriptName));
         $basePath = $basePath === '.' || $basePath === '/' ? '' : rtrim($basePath, '/');
+        $relativePath = ltrim($path, '/');
+        $publicRoot = defined('FCPATH') ? FCPATH : (defined('ROOTPATH') ? ROOTPATH . 'public' . DIRECTORY_SEPARATOR : '');
+        $filePath = $publicRoot !== '' ? $publicRoot . str_replace('/', DIRECTORY_SEPARATOR, $relativePath) : '';
+        $version = $filePath !== '' && is_file($filePath) ? (string) filemtime($filePath) : '';
+        $suffix = $version !== '' ? '?v=' . $version : '';
 
-        return ($basePath ?: '') . '/' . ltrim($path, '/');
+        return ($basePath ?: '') . '/' . $relativePath . $suffix;
     }
 }
 

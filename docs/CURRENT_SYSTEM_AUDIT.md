@@ -27,6 +27,7 @@ Project hiện tại là **CodeIgniter 4.7.3**, PHP 8.2+, MySQL/Mysqli và PHPUn
 - Tournament, registration, category, rule, sponsor, bracket, group, match, scoring và scheduler.
 - SaaS plan, subscription, usage, auth security, password reset, session tracking.
 - Notification center, notification templates, job queue đơn giản và media library.
+- AI scheduling request queue với local heuristic/fallback, livestream channel lifecycle và outbound webhook endpoint/delivery queue.
 
 ## 3. Bản đồ file chính
 
@@ -37,8 +38,8 @@ Project hiện tại là **CodeIgniter 4.7.3**, PHP 8.2+, MySQL/Mysqli và PHPUn
 | Services | `app/Services`, booking/pricing/payment/facility/player/tournament là các lõi có thể tái sử dụng |
 | Models | `app/Models`, bám theo các bảng migration hiện có |
 | Views | `app/Views/layouts`, `admin`, `player`, `public`, `referee` |
-| Database | Các migration module đã migrate đến `2026-08-09-270000` trên môi trường phát triển |
-| Tests | 124 tests, 342 assertions cho auth, RBAC, booking, payment, social, coaching, competition, growth, community và vận hành |
+| Database | Các migration module đã migrate đến `2026-08-09-300000` trên môi trường phát triển |
+| Tests | 132 tests, 372 assertions cho auth, RBAC, booking, payment, social, coaching, competition, growth, community, AI scheduling, livestream, webhook và vận hành |
 
 ## 4. Reuse map
 
@@ -49,6 +50,7 @@ Project hiện tại là **CodeIgniter 4.7.3**, PHP 8.2+, MySQL/Mysqli và PHPUn
 - Người chơi phải dùng `PlayerService`, `PlayerModel`, membership/wallet/rating hiện có.
 - Notification phải dùng `NotificationService`, notification models và job queue hiện có.
 - Menu dùng `app/Views/layouts/partials/sidebar.php`, đã có lọc theo permission; chỉ bổ sung các route/module đã tồn tại.
+- AI scheduling/livestream/webhook dùng service riêng, API/admin/player surface đúng tenant; secret webhook không trả về UI/API.
 
 ## 5. Gap analysis theo ưu tiên
 
@@ -117,4 +119,7 @@ Project hiện tại là **CodeIgniter 4.7.3**, PHP 8.2+, MySQL/Mysqli và PHPUn
 - API mobile đã mở coaching/competition surface dưới `apiauth`; dashboard/report có invoice billed/collected/outstanding.
 - API `/api/*` đã có rate-limit filter 120 request/phút theo client identity; contract mobile được ghi tại `docs/OPENAPI.md`.
 - Community đã có post/comment/reaction, tenant-scoped feed, player menu, API mobile, transaction và audit.
-- Full test hiện đạt 124 tests / 342 assertions; migration đã chạy đến `2026-08-09-270000`.
+- AI scheduling đã có request queue, local heuristic/fallback cho OR-Tools, date/court constraint, human-in-the-loop result và audit; migration `280000`.
+- Livestream đã có channel lifecycle draft → scheduled → live → ended, HTTPS URL/embed validation, tenant-scoped admin/player/API và audit; migration `290000`.
+- Webhook đã có endpoint secret mã hóa at-rest, event subscription, HMAC SHA-256, delivery status/attempts/backoff, queue job và CLI worker; booking.created được dispatch sau commit; migration `300000`.
+- Full test hiện đạt 132 tests / 372 assertions; migration đã chạy đến `2026-08-09-300000`.

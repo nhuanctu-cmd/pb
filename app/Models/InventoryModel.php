@@ -25,7 +25,7 @@ class InventoryModel extends Model
 
     public function getByBranch(int $tenantId, int $branchId)
     {
-        return $this->select('inventories.*, products.name_vi, products.sku, products.unit, products.sale_price, product_categories.name_vi as category_name')
+        return $this->select('inventories.*, products.name_vi, products.sku, products.unit, products.cost_price, products.sale_price, products.status, product_categories.name_vi as category_name')
             ->join('products', 'products.id = inventories.product_id')
             ->join('product_categories', 'product_categories.id = products.category_id')
             ->where('inventories.tenant_id', $tenantId)

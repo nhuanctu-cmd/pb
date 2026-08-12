@@ -7,6 +7,9 @@ use App\Services\PosService;
 use App\Services\InventoryService;
 use App\Models\BookingModel;
 use App\Models\PlayerModel;
+use App\Models\InventoryModel;
+use App\Models\InventoryMovementModel;
+use App\Models\ProductModel;
 use CodeIgniter\HTTP\ResponseInterface;
 
 class PosController extends BaseController
@@ -41,6 +44,77 @@ class PosController extends BaseController
         ];
 
         return view('admin/pos/counter', $data);
+    }
+
+    public function inventory(): string
+    {
+        $tenantId = (int) session()->get('tenant_id');
+        $branchId = (int) session()->get('branch_id');
+        $inventoryModel = new InventoryModel();
+        $productModel = new ProductModel();
+
+        return view('admin/pos/inventory', [
+            'pageTitle' => 'Tồn kho',
+            'inventories' => $tenantId && $branchId ? $inventoryModel->getByBranch($tenantId, $branchId) : [],
+            'products' => $tenantId ? $productModel->where('tenant_id', $tenantId)->where('status', 'active')->orderBy('name_vi')->findAll() : [],
+        ]);
+    }
+
+    public function inventoryHistory(): string
+    {
+        $tenantId = (int) session()->get('tenant_id');
+        $branchId = (int) session()->get('branch_id');
+        $type = trim((string) $this->request->getGet('type'));
+
+        return view('admin/pos/inventory_history', [
+            'pageTitle' => 'Lịch sử tồn kho',
+            'movements' => $tenantId ? (new InventoryMovementModel())->getByTenant($tenantId, $branchId ?: null, $type ?: null) : [],
+        ]);
+    }
+
+    public function getStock(int $productId): ResponseInterface
+    {
+        $tenantId = (int) session()->get('tenant_id');
+        $branchId = (int) session()->get('branch_id');
+        $stock = $tenantId && $branchId
+            ? (new InventoryModel())->where('tenant_id', $tenantId)->where('branch_id', $branchId)->where('product_id', $productId)->first()
+            : null;
+
+        return $this->response->setJSON(['success' => (bool) $stock, 'stock' => $stock]);
+    }
+
+    public function importStock(): ResponseInterface
+    {
+        return $this->changeStock('import');
+    }
+
+    public function adjustStock(): ResponseInterface
+    {
+        return $this->changeStock('adjust');
+    }
+
+    private function changeStock(string $operation): ResponseInterface
+    {
+        $tenantId = (int) session()->get('tenant_id');
+        $branchId = (int) session()->get('branch_id');
+        $productId = (int) $this->request->getPost('product_id');
+        $userId = (int) (session()->get('user_id') ?: session()->get('userId'));
+
+        try {
+            if (! $tenantId || ! $branchId || ! $productId) {
+                throw new \InvalidArgumentException('Thiếu tenant, chi nhánh hoặc sản phẩm.');
+            }
+            if ($operation === 'import') {
+                $quantity = (int) $this->request->getPost('quantity');
+                $ok = $this->inventoryService->importStock($tenantId, $branchId, $productId, $quantity, $userId, (string) $this->request->getPost('note'));
+            } else {
+                $quantity = (int) $this->request->getPost('new_quantity');
+                $ok = $this->inventoryService->adjustStock($tenantId, $branchId, $productId, $quantity, $userId, (string) $this->request->getPost('note'));
+            }
+            return $this->response->setJSON(['success' => (bool) $ok, 'message' => $ok ? 'Đã cập nhật tồn kho.' : 'Không thể cập nhật tồn kho.']);
+        } catch (\Throwable $e) {
+            return $this->response->setStatusCode(422)->setJSON(['success' => false, 'message' => $e->getMessage()]);
+        }
     }
 
     /**
@@ -205,7 +279,7 @@ class PosController extends BaseController
     {
         $tenantId = session()->get('tenant_id');
         $branchId = session()->get('branch_id');
-        $keyword = $this->request->getGet('q');
+        $keyword = trim((string) $this->request->getGet('q'));
 
         if (strlen($keyword) < 2) {
             return $this->response->setJSON(['products' => []]);
@@ -223,7 +297,10 @@ class PosController extends BaseController
     {
         $tenantId = session()->get('tenant_id');
         $branchId = session()->get('branch_id');
-        $keyword = $this->request->getGet('q');
+        $keyword = trim((string) $this->request->getGet('q'));
+        if ($keyword === '') {
+            return $this->response->setJSON(['bookings' => []]);
+        }
 
         $bookings = $this->bookingModel
             ->where('tenant_id', $tenantId)
@@ -246,7 +323,10 @@ class PosController extends BaseController
     public function searchPlayers(): ResponseInterface
     {
         $tenantId = session()->get('tenant_id');
-        $keyword = $this->request->getGet('q');
+        $keyword = trim((string) $this->request->getGet('q'));
+        if ($keyword === '') {
+            return $this->response->setJSON(['players' => []]);
+        }
 
         $players = $this->playerModel
             ->where('tenant_id', $tenantId)

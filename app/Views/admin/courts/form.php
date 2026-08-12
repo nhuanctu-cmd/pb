@@ -34,6 +34,16 @@ $action = $isEdit ? '/admin/courts/update/' . $court->id : '/admin/courts/create
                     </select>
                 </div>
                 <div class="erp-field">
+                    <label>CLB vận hành</label>
+                    <select name="club_id" class="erp-select">
+                        <option value="">Chưa gán CLB</option>
+                        <?php foreach (($clubs ?? []) as $club): ?>
+                            <option value="<?= (int) $club->id ?>" <?= old('club_id', $court->club_id ?? '') == $club->id ? 'selected' : '' ?>><?= esc($club->name_vi) ?><?= $club->name_en ? ' · ' . esc($club->name_en) : '' ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                      <div class="erp-hint">CLB được quản lý trong tenant hiện tại và sẽ hiển thị ở lưới sân. <a href="/admin/clubs/create">Tạo CLB mới</a>.</div>
+                </div>
+                <div class="erp-field">
                     <label>Mã sân <span class="erp-required">*</span></label>
                     <input name="code" class="erp-control" required maxlength="50" value="<?= esc(old('code', $court->code ?? '')) ?>" placeholder="A01">
                     <div class="erp-hint">Mã nên ngắn, dễ đọc trên lịch vận hành.</div>

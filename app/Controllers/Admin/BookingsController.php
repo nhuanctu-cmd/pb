@@ -111,6 +111,11 @@ class BookingsController extends BaseController
     public function create()
     {
         $tenantId = session()->get('tenant_id');
+        $prefill = [
+            'customer_name'  => (string) $this->request->getGet('customer_name'),
+            'customer_phone' => (string) $this->request->getGet('customer_phone'),
+            'customer_email' => (string) $this->request->getGet('customer_email'),
+        ];
         $branches = $this->branchModel->getByTenant($tenantId);
         $branchId = $this->request->getGet('branch_id');
 
@@ -121,6 +126,7 @@ class BookingsController extends BaseController
 
         return $this->render('admin/bookings/form', [
             'pageTitle' => lang('App.create_booking'),
+            'prefill'   => $prefill,
             'branches'  => $branches,
             'branchId'  => $branchId,
             'courts'    => $courts,

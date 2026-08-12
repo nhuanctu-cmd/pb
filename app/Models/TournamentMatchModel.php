@@ -13,7 +13,7 @@ class TournamentMatchModel extends Model
     protected $allowedFields = [
         'tenant_id', 'tournament_id', 'category_id', 'group_id', 'round_name', 'match_no',
         'court_id', 'scheduled_date', 'start_time', 'end_time', 'team_a_id', 'team_b_id',
-        'winner_team_id', 'status', 'is_locked',
+        'winner_team_id', 'unified_match_id', 'status', 'is_locked',
     ];
     protected $useTimestamps = true;
     protected $dateFormat = 'datetime';

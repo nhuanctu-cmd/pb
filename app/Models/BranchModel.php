@@ -13,7 +13,7 @@ class BranchModel extends Model
     protected $useSoftDeletes   = true;
     protected $protectFields    = true;
     protected $allowedFields    = [
-        'tenant_id', 'facility_id', 'code', 'branch_type', 'name', 'email', 'phone', 'address',
+        'tenant_id', 'facility_id', 'code', 'branch_type', 'name', 'email', 'phone', 'address', 'country_code', 'timezone', 'currency',
         'city', 'district', 'latitude', 'longitude',
         'total_courts', 'indoor_courts', 'outdoor_courts',
         'has_parking', 'has_canteen', 'has_locker', 'has_shower', 'has_wifi',

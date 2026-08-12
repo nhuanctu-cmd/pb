@@ -1,38 +1,12 @@
-<!DOCTYPE html>
-<html lang="<?= esc($current_locale ?? 'vi') ?>">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= esc($pageTitle) ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css" rel="stylesheet">
-    <style>body{background:#f7fafc}.register-shell{max-width:760px}.panel{border:1px solid #e2e8f0;border-radius:8px;background:white;padding:24px}</style>
-</head>
-<body>
-<main class="container py-4 register-shell">
-    <a href="/tournaments/<?= esc($tournament->slug_vi) ?>" class="btn btn-outline-secondary btn-sm mb-3"><i class="bi bi-arrow-left"></i></a>
-    <div class="panel">
-        <h1 class="h3 mb-1"><?= esc(lang('Tournament.register')) ?></h1>
-        <p class="text-muted"><?= esc($localized($tournament, 'name')) ?></p>
-        <?= flash_message() ?>
-        <form method="post" action="/tournaments/<?= esc($tournament->slug_vi) ?>/register" class="row g-3">
-            <?= csrf_field() ?>
-            <div class="col-12">
-                <label class="form-label"><?= esc(lang('Tournament.category')) ?></label>
-                <select name="category_id" class="form-select" required>
-                    <?php foreach ($categories as $category): ?>
-                        <option value="<?= $category->id ?>"><?= esc($localized($category, 'name')) ?> - <?= format_money($category->registration_fee) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="col-md-6"><label class="form-label"><?= esc(lang('Tournament.contact_name')) ?></label><input name="contact_name" class="form-control" required></div>
-            <div class="col-md-6"><label class="form-label"><?= esc(lang('Tournament.contact_phone')) ?></label><input name="contact_phone" class="form-control" required></div>
-            <div class="col-md-6"><label class="form-label"><?= esc(lang('Tournament.contact_email')) ?></label><input type="email" name="contact_email" class="form-control"></div>
-            <div class="col-md-6"><label class="form-label">Team ID</label><input name="team_id" class="form-control" placeholder="Nếu đăng ký theo đội"></div>
-            <div class="col-12"><label class="form-label"><?= esc(lang('Tournament.note')) ?></label><textarea name="note" class="form-control" rows="3"></textarea></div>
-            <div class="col-12"><button class="btn btn-success btn-lg w-100"><?= esc(lang('Tournament.submit')) ?></button></div>
-        </form>
-    </div>
-</main>
-</body>
-</html>
+<?php
+$locale = $current_locale ?? 'vi';
+$categoryTypeLabels = ['single_male' => 'Đơn nam', 'single_female' => 'Đơn nữ', 'double_male' => 'Đôi nam', 'double_female' => 'Đôi nữ', 'mixed_double' => 'Đôi nam nữ', 'team_battle' => 'Đồng đội'];
+?>
+<!doctype html>
+<html lang="<?= esc($locale) ?>"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title><?= esc($pageTitle) ?></title><link rel="stylesheet" href="<?= esc(asset_url('assets/css/tournament-public.css')) ?>"><link rel="stylesheet" href="<?= esc(asset_url('assets/css/tournament-detail-public.css')) ?>"><link rel="stylesheet" href="<?= esc(asset_url('assets/css/tournament-register-public.css')) ?>"></head>
+<body class="tournament-public-body">
+<header class="tp-header"><div class="tp-container tp-nav"><a class="tp-brand" href="/"><span class="tp-mark">NP</span><span><strong>NATIONAL</strong><small>PICKLEBALL RANKING</small></span></a><nav><a href="/ranking">BXH</a><a href="/players">VĐV</a><a class="is-active" href="/tournaments">Giải đấu</a><a href="/clubs">CLB</a><a href="/live">Live</a></nav><div class="tp-actions"><a href="/locale/switch/<?= $locale === 'vi' ? 'en' : 'vi' ?>"><?= $locale === 'vi' ? 'EN' : 'VI' ?></a><a class="tp-login" href="/login">Đăng nhập</a></div></div></header>
+<main><section class="tr-hero"><div class="tp-container"><a class="td-back" href="/tournaments/<?= esc($tournament->slug_vi) ?>">← Quay lại chi tiết giải</a><span class="tp-eyebrow">REGISTRATION / <?= esc(strtoupper((string) ($tournament->verification_level ?? 'community'))) ?></span><h1>Đăng ký<br><em>tham dự giải.</em></h1><p><?= esc($localized($tournament, 'name')) ?> · <?= esc($tournament->start_date ?? 'Lịch đang cập nhật') ?></p></div></section>
+<section class="tp-container tr-layout"><div class="tr-form-column"><?= flash_message() ?><div class="tr-panel"><div class="tr-panel-heading"><div><span class="tp-eyebrow">01 / YOUR ENTRY</span><h2>Thông tin <em>đăng ký</em></h2></div><span class="tr-step">STEP 1 / 1</span></div><form method="post" action="/tournaments/<?= esc($tournament->slug_vi) ?>/register" class="tr-form"><?= csrf_field() ?><label>Hạng mục thi đấu<select name="category_id" required><option value="">Chọn hạng mục</option><?php foreach ($categories as $category): ?><option value="<?= (int) $category->id ?>"><?= esc($localized($category, 'name')) ?> · <?= esc($categoryTypeLabels[$category->category_type] ?? $category->category_type) ?> · <?= format_money($category->registration_fee) ?> · <?= $category->capacity ? (int) $category->confirmed_count . '/' . (int) $category->capacity . ' suất' : 'Không giới hạn' ?></option><?php endforeach; ?></select><small>Eligibility sẽ được hệ thống và ban tổ chức kiểm tra sau khi gửi.</small></label><div class="tr-form-grid"><label>Họ và tên liên hệ<input name="contact_name" required autocomplete="name" placeholder="Nguyễn Văn A"></label><label>Số điện thoại<input name="contact_phone" required autocomplete="tel" placeholder="09xx xxx xxx"></label></div><div class="tr-form-grid"><label>Email<input type="email" name="contact_email" autocomplete="email" placeholder="you@example.com"></label><label>National Player ID <span>(nếu có)</span><input type="number" name="player_id" min="1" placeholder="VD: 128"></label></div><div class="tr-form-grid"><label>Partner Player ID <span>(nếu đăng ký đôi)</span><input type="number" name="partner_player_id" min="1" placeholder="VD: 256"></label><label>Team ID <span>(nếu đăng ký đội)</span><input name="team_id" placeholder="Nếu có đội đã tạo"></label></div><label>Ghi chú cho ban tổ chức<textarea name="note" rows="4" placeholder="Yêu cầu đặc biệt, thông tin bổ sung…"></textarea></label><label class="tr-consent"><input type="checkbox" required><span>Tôi xác nhận thông tin cung cấp là chính xác và đồng ý với điều lệ, chính sách xử lý dữ liệu của giải đấu.</span></label><button class="tp-button tp-button-orange" type="submit">Gửi đăng ký <span>→</span></button></form></div></div>
+<aside class="tr-aside"><div class="tr-summary"><span class="tp-eyebrow">EVENT SUMMARY</span><h2><?= esc($localized($tournament, 'name')) ?></h2><div><b>Thời gian</b><span><?= esc($tournament->start_date ?? '—') ?> → <?= esc($tournament->end_date ?? '—') ?></span></div><div><b>Địa điểm</b><span><?= esc($tournament->branch_name ?? 'Đang cập nhật') ?></span></div><div><b>Hạn đăng ký</b><span><?= esc(format_datetime($tournament->registration_end)) ?></span></div><div><b>Đã xác nhận</b><span><?= number_format((int) ($confirmed_total ?? 0)) ?> lượt</span></div></div><div class="tr-help"><span class="tp-eyebrow">WHAT HAPPENS NEXT</span><ol><li>Gửi thông tin đăng ký</li><li>Hệ thống kiểm tra eligibility</li><li>Ban tổ chức duyệt và xác nhận</li><li>Nhận hướng dẫn thanh toán / check-in</li></ol><a href="/verify">Xem chính sách xác minh <span>↗</span></a></div></aside></section></main>
+<footer class="tp-footer"><div class="tp-container"><div class="tp-footer-bottom"><span>© <?= date('Y') ?> National Pickleball Ranking</span><span>Dữ liệu đăng ký được bảo vệ theo chính sách công khai</span></div></div></footer></body></html>

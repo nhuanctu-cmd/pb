@@ -5,6 +5,8 @@ namespace App\Controllers;
 use App\Models\UserModel;
 use App\Models\UserRoleModel;
 use App\Models\TenantModel;
+use App\Models\BranchModel;
+use App\Models\PlayerModel;
 use App\Services\AuditLogService;
 use App\Services\AuthSecurityService;
 use App\Services\PasswordResetService;
@@ -27,7 +29,7 @@ class AuthController extends BaseController
     public function login()
     {
         if (session()->get('isLoggedIn')) {
-            return redirect()->to('/admin/dashboard');
+            return redirect()->to(session()->get('account_type') === 'player' ? '/player' : '/admin/dashboard');
         }
 
         return $this->render('public/login', [
@@ -98,9 +100,28 @@ class AuthController extends BaseController
         $branchId = $user->branch_id;
         $tenantName = null;
         $tenantModel = new TenantModel();
+        $branchModel = new BranchModel();
+        $userRoleModel = new UserRoleModel();
+        $roles = $userRoleModel->getRolesByUser((int) $user->id);
+        $roleSlugs = array_values(array_filter(array_map(static fn ($role) => (string) ($role->slug ?? ''), $roles)));
+        $primaryRole = $roleSlugs[0] ?? ($user->is_superadmin ? 'super-admin' : 'staff');
+        foreach (['super-admin', 'owner', 'branch-manager', 'staff', 'referee', 'player'] as $preferredRole) {
+            if (in_array($preferredRole, $roleSlugs, true)) {
+                $primaryRole = $preferredRole;
+                break;
+            }
+        }
+        $accountType = $user->is_superadmin || in_array('super-admin', $roleSlugs, true)
+            ? 'superadmin'
+            : ($primaryRole === 'player' ? 'player' : 'admin');
 
         if (empty($tenantId)) {
-            $tenant = $tenantModel->where('status', 'active')->orderBy('id', 'ASC')->first();
+            // Chỉ tài khoản demo mới tự động vào tenant demo. Superadmin
+            // khác vẫn vào tenant active đầu tiên theo hành vi mặc định.
+            $tenant = $user->email === 'admin@demo-pickleball.vn'
+                ? $tenantModel->where('code', 'DEMO-PB')->where('status', 'active')->first()
+                : null;
+            $tenant ??= $tenantModel->where('status', 'active')->orderBy('id', 'ASC')->first();
             $tenantId = $tenant->id ?? null;
         } else {
             $tenant = $tenantModel->find($tenantId);
@@ -110,9 +131,47 @@ class AuthController extends BaseController
             $tenantName = $tenant->name ?? null;
         }
 
+        // Branch của user phải thuộc đúng tenant hiện tại.
+        if (!empty($branchId) && !empty($tenantId)) {
+            $validBranch = $branchModel->where('id', $branchId)
+                ->where('tenant_id', $tenantId)
+                ->where('deleted_at', null)
+                ->first();
+            if (!$validBranch) {
+                $branchId = null;
+            }
+        }
         if (empty($branchId) && !empty($tenantId)) {
-            $branch = model(\App\Models\BranchModel::class)->where('tenant_id', $tenantId)->orderBy('is_main', 'DESC')->first();
+            $branch = $branchModel->where('tenant_id', $tenantId)->where('deleted_at', null)->orderBy('is_main', 'DESC')->first();
             $branchId = $branch->id ?? null;
+        }
+
+        $playerId = null;
+        $playerName = null;
+        if ($accountType === 'player' && !empty($tenantId)) {
+            $playerModel = new PlayerModel();
+            $player = $playerModel->where('user_id', $user->id)
+                ->where('tenant_id', $tenantId)
+                ->where('deleted_at', null)
+                ->first();
+            $player ??= $playerModel->where('tenant_id', $tenantId)
+                ->where('email', $user->email)
+                ->where('deleted_at', null)
+                ->first();
+            if (!$player) {
+                $playerId = $playerModel->insert([
+                    'tenant_id' => $tenantId,
+                    'user_id' => $user->id,
+                    'player_code' => 'USER-' . str_pad((string) $user->id, 6, '0', STR_PAD_LEFT),
+                    'full_name' => $user->getFullName(),
+                    'email' => $user->email,
+                    'home_branch_id' => $branchId,
+                    'status' => 'active',
+                ]) ?: null;
+                $player = $playerId ? $playerModel->find($playerId) : null;
+            }
+            $playerId = $player->id ?? $playerId;
+            $playerName = $player->full_name ?? $user->getFullName();
         }
 
         session()->set([
@@ -120,13 +179,18 @@ class AuthController extends BaseController
             'user_id'       => $user->id,
             'username'      => $user->username,
             'email'         => $user->email,
-            'fullName'      => $user->first_name . ' ' . $user->last_name,
+            'fullName'      => $user->getFullName(),
             'avatar'        => $user->avatar,
             'isLoggedIn'    => true,
             'is_superadmin' => (bool) $user->is_superadmin,
+            'roles'         => $roleSlugs,
+            'primary_role'  => $primaryRole,
+            'account_type'  => $accountType,
             'tenant_id'     => $tenantId,
             'tenant_name'   => $tenantName,
             'branch_id'     => $branchId,
+            'player_id'     => $playerId,
+            'player_name'   => $playerName,
             'locale'        => session()->get('locale') ?? 'en',
         ]);
 
@@ -153,7 +217,7 @@ class AuthController extends BaseController
 
         session()->setFlashdata('success', lang('Auth.loginSuccess'));
 
-        return redirect()->to('/admin/dashboard');
+        return redirect()->to($accountType === 'player' ? '/player' : '/admin/dashboard');
     }
 
     public function logout()

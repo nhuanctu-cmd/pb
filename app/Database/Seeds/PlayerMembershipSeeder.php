@@ -19,19 +19,34 @@ class PlayerMembershipSeeder extends Seeder
             }
         }
 
-        $tenantId = $this->getTenantId();
-        if (! $tenantId) {
+        $tenantIds = array_map(
+            'intval',
+            array_column(
+                $this->db->table('tenants')
+                    ->select('id')
+                    ->where('is_active', 1)
+                    ->where('status', 'active')
+                    ->where('deleted_at', null)
+                    ->orderBy('id', 'ASC')
+                    ->get()
+                    ->getResultArray(),
+                'id'
+            )
+        );
+        if (empty($tenantIds)) {
             echo "No tenant found. Run CoreSeeder or DemoDataSeeder first.\n";
             return;
         }
 
-        $packages = $this->seedPackages($tenantId);
-        $players = $this->seedPlayers($tenantId);
-        $this->seedMemberships($tenantId, $players, $packages);
-        $this->seedWallets($tenantId, $players);
-        $this->seedRanking($tenantId, $players);
+        foreach ($tenantIds as $tenantId) {
+            $packages = $this->seedPackages($tenantId);
+            $players = $this->seedPlayers($tenantId);
+            $this->seedMemberships($tenantId, $players, $packages);
+            $this->seedWallets($tenantId, $players);
+            $this->seedRanking($tenantId, $players);
+        }
 
-        echo "Seeded player and membership demo data: 500 players, 5 packages, wallets, transactions, ranking.\n";
+        echo "Seeded player and membership demo data for " . count($tenantIds) . " tenants: 500 players/tenant, packages, wallets, transactions, ranking.\n";
     }
 
     private function getTenantId(): ?int
@@ -81,10 +96,14 @@ class PlayerMembershipSeeder extends Seeder
 
     private function seedPlayers(int $tenantId): array
     {
+        // player_code là unique toàn hệ thống, nên mỗi tenant ngoài tenant 1
+        // dùng prefix riêng để có thể chạy seeder độc lập, không xung đột.
+        $playerCodePrefix = $tenantId === 1 ? 'DEMO-P' : 'DEMO' . $tenantId . '-P';
+
         $existing = $this->db->table('players')
             ->select('id')
             ->where('tenant_id', $tenantId)
-            ->like('player_code', 'DEMO-P', 'after')
+            ->like('player_code', $playerCodePrefix, 'after')
             ->orderBy('id', 'ASC')
             ->get()
             ->getResultArray();
@@ -111,7 +130,7 @@ class PlayerMembershipSeeder extends Seeder
             $name = $lastNames[$i % count($lastNames)] . ' ' . $firstNames[$i % count($firstNames)] . ' ' . str_pad((string) $i, 3, '0', STR_PAD_LEFT);
             $this->db->table('players')->insert($this->filterColumns('players', [
                 'tenant_id' => $tenantId,
-                'player_code' => 'DEMO-P' . str_pad((string) $i, 4, '0', STR_PAD_LEFT),
+                'player_code' => $playerCodePrefix . str_pad((string) $i, 4, '0', STR_PAD_LEFT),
                 'full_name' => $name,
                 'phone' => '0988' . str_pad((string) $i, 6, '0', STR_PAD_LEFT),
                 'email' => 'player' . $i . '@demo-pickleball.vn',

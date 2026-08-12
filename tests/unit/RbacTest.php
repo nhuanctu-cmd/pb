@@ -38,8 +38,8 @@ class RbacTest extends CIUnitTestCase
                 ->where('role_id', $role['id'])->countAllResults();
         }
 
-        $this->assertSame(73, $counts['super-admin'], 'Super admin phải có đủ 73 quyền');
-        $this->assertSame(65, $counts['owner']);
+        $this->assertSame(87, $counts['super-admin'], 'Super admin phải có đủ 87 quyền');
+        $this->assertSame(68, $counts['owner']);
         $this->assertSame(31, $counts['branch-manager']);
         $this->assertSame(14, $counts['staff']);
         $this->assertSame(5, $counts['referee']);

@@ -26,6 +26,7 @@ class TenantFilter implements FilterInterface
 
         // Store tenant_id in request for controllers to use
         $request->tenant_id = $tenantId;
+        $request->tenant_context = service('tenantDataPolicy')->context((int) $tenantId, (int) $tenantId, false);
     }
 
     public function after(RequestInterface $request, ResponseInterface $response, $arguments = null)

@@ -43,6 +43,11 @@ class PaymentController extends BaseController
         $status = $this->request->getGet('status');
 
         $invoices = $this->invoiceModel->getByTenant($tenantId, $branchId, $status);
+        // InvoiceModel returns Invoice entities. Normalize the collection for
+        // the legacy table view, which consumes array-style rows.
+        $invoices = array_map(static function ($invoice): array {
+            return is_array($invoice) ? $invoice : $invoice->toArray();
+        }, $invoices);
 
         $data = [
             'invoices' => $invoices,
@@ -62,9 +67,10 @@ class PaymentController extends BaseController
         );
 
         $data = [
-            'invoice' => $details['invoice'],
-            'payments' => $details['payments'],
-            'refunds' => $details['refunds'],
+            // Legacy detail template uses array offsets while the model returns an Entity.
+            'invoice' => is_object($details['invoice']) ? $details['invoice']->toRawArray() : $details['invoice'],
+            'payments' => array_map(static fn ($payment): array => is_object($payment) ? $payment->toRawArray() : $payment, $details['payments']),
+            'refunds' => array_map(static fn ($refund): array => is_object($refund) ? $refund->toRawArray() : $refund, $details['refunds']),
         ];
 
         return view('admin/payments/detail', $data);
@@ -212,8 +218,10 @@ class PaymentController extends BaseController
         $tenantId = session()->get('tenant_id');
         $config = $this->qrConfigModel->getActiveByTenant($tenantId);
 
-        $data = ['config' => $config];
-        return view('admin/payments/qr_config', $data);
+        return $this->render('admin/payments/qr_config', [
+            'pageTitle' => 'Cấu hình QR thanh toán',
+            'config' => $config,
+        ]);
     }
 
     /**
@@ -227,6 +235,7 @@ class PaymentController extends BaseController
             'bank_name' => $this->request->getPost('bank_name'),
             'bank_account' => $this->request->getPost('bank_account'),
             'account_name' => $this->request->getPost('account_name'),
+            'qr_template' => $this->request->getPost('qr_template'),
             'status' => 'active',
         ];
 
@@ -242,7 +251,11 @@ class PaymentController extends BaseController
             return $this->response->setStatusCode(500)->setJSON(['success' => false]);
         }
 
-        return $this->response->setJSON(['success' => true]);
+        if ($this->request->isAJAX()) {
+            return $this->response->setJSON(['success' => true]);
+        }
+
+        return redirect()->to('/admin/payments/qr-config')->with('success', 'Đã lưu cấu hình QR.');
     }
 
     /**

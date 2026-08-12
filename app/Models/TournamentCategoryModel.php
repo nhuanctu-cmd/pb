@@ -12,7 +12,10 @@ class TournamentCategoryModel extends Model
     protected $useSoftDeletes = true;
     protected $allowedFields = [
         'tenant_id', 'tournament_id', 'name_vi', 'name_en', 'category_type',
-        'max_teams', 'min_rating', 'max_rating', 'registration_fee', 'status',
+        'discipline', 'gender_category', 'age_category', 'team_size',
+        'max_teams', 'entry_capacity', 'waitlist_capacity',
+        'min_rating', 'max_rating', 'registration_fee', 'status',
+        'eligibility_rules',
     ];
     protected $useTimestamps = true;
     protected $dateFormat = 'datetime';

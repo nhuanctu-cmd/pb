@@ -15,6 +15,8 @@ use App\Models\CourtMaintenanceModel;
 use App\Models\BranchOpeningHourModel;
 use App\Models\BranchHolidayModel;
 use App\Models\BranchMediaModel;
+use App\Models\ClubModel;
+use App\Models\FacilityClubAssignmentModel;
 
 class FacilityService
 {
@@ -31,6 +33,8 @@ class FacilityService
     protected BranchOpeningHourModel $branchOpeningHourModel;
     protected BranchHolidayModel $branchHolidayModel;
     protected BranchMediaModel $branchMediaModel;
+    protected ClubModel $clubModel;
+    protected FacilityClubAssignmentModel $facilityClubAssignmentModel;
 
     public function __construct()
     {
@@ -47,6 +51,8 @@ class FacilityService
         $this->branchOpeningHourModel = new BranchOpeningHourModel();
         $this->branchHolidayModel     = new BranchHolidayModel();
         $this->branchMediaModel       = new BranchMediaModel();
+        $this->clubModel              = new ClubModel();
+        $this->facilityClubAssignmentModel = new FacilityClubAssignmentModel();
     }
 
     // ========== FACILITY MANAGEMENT ==========
@@ -54,6 +60,40 @@ class FacilityService
     public function getAllFacilities(int $tenantId, array $filters = [])
     {
         return $this->facilityModel->getByTenant($tenantId, $filters);
+    }
+
+    public function getTenantClubs(int $tenantId): array
+    {
+        return $tenantId ? $this->clubModel->getByTenant($tenantId, ['status' => 'active']) : [];
+    }
+
+    public function getFacilityClubs(int $facilityId, int $tenantId, bool $activeOnly = true): array
+    {
+        if (! $this->facilityClubAssignmentModel->db->tableExists('facility_club_assignments')) return [];
+        return $this->facilityClubAssignmentModel->getForFacility($facilityId, $tenantId, $activeOnly);
+    }
+
+    public function assignClubToFacility(int $facilityId, int $clubId, int $tenantId, int $actorId = 0, bool $primary = false, ?string $notes = null): array
+    {
+        if (! $this->facilityModel->findForTenant($facilityId, $tenantId)) return ['success' => false, 'message' => 'Cụm sân không thuộc tenant hiện tại.'];
+        if (! $this->clubModel->findForTenant($clubId, $tenantId)) return ['success' => false, 'message' => 'CLB không thuộc tenant hiện tại.'];
+        if (! $this->facilityClubAssignmentModel->db->tableExists('facility_club_assignments')) return ['success' => false, 'message' => 'Chưa có schema gán CLB cho cụm sân.'];
+
+        $db = $this->facilityClubAssignmentModel->db;
+        $db->transStart();
+        if ($primary) $db->table('facility_club_assignments')->where('tenant_id', $tenantId)->where('facility_id', $facilityId)->update(['is_primary' => 0, 'updated_by' => $actorId ?: null, 'updated_at' => date('Y-m-d H:i:s')]);
+        $existing = $db->table('facility_club_assignments')->where('tenant_id', $tenantId)->where('facility_id', $facilityId)->where('club_id', $clubId)->get()->getRow();
+        $data = ['tenant_id' => $tenantId, 'facility_id' => $facilityId, 'club_id' => $clubId, 'status' => 'active', 'is_primary' => $primary ? 1 : (int) ($existing->is_primary ?? 0), 'notes' => $notes, 'updated_by' => $actorId ?: null, 'updated_at' => date('Y-m-d H:i:s')];
+        if ($existing) $db->table('facility_club_assignments')->where('id', $existing->id)->update($data);
+        else $db->table('facility_club_assignments')->insert($data + ['created_by' => $actorId ?: null, 'created_at' => date('Y-m-d H:i:s')]);
+        $db->transComplete();
+        return ['success' => $db->transStatus(), 'message' => $db->transStatus() ? 'Đã gán CLB vào cụm sân.' : 'Không thể gán CLB vào cụm sân.'];
+    }
+
+    public function removeClubFromFacility(int $assignmentId, int $tenantId, int $actorId = 0): bool
+    {
+        if (! $this->facilityClubAssignmentModel->db->tableExists('facility_club_assignments')) return false;
+        return (bool) $this->facilityClubAssignmentModel->where('id', $assignmentId)->where('tenant_id', $tenantId)->update(['status' => 'inactive', 'updated_by' => $actorId ?: null, 'updated_at' => date('Y-m-d H:i:s')]);
     }
 
     public function getFacilityById(int $id)
@@ -83,7 +123,16 @@ class FacilityService
     public function deleteFacility(int $id): bool
     {
         // Check if facility has branches
-        $branches = $this->branchModel->where('facility_id', $id)->countAllResults();
+        $facility = $this->facilityModel->find($id);
+        $branchQuery = $this->branchModel;
+        if ($this->hasBranchFacilityColumn()) {
+            $branchQuery->where('facility_id', $id);
+        } elseif ($facility) {
+            // Older installations may have facilities but not the optional
+            // relation column on branches. Keep the module usable by tenant.
+            $branchQuery->where('tenant_id', $facility->tenant_id);
+        }
+        $branches = $branchQuery->countAllResults();
         if ($branches > 0) {
             return false;
         }
@@ -95,11 +144,14 @@ class FacilityService
         $facility = $this->facilityModel->find($facilityId);
         if (!$facility) return [];
 
-        $branches = $this->branchModel->where('facility_id', $facilityId)
+        $branchQuery = $this->branchModel
             ->where('tenant_id', $facility->tenant_id)
-            ->where('deleted_at', null)
-            ->findAll();
-        $branchIds = array_column($branches, 'id');
+            ->where('deleted_at', null);
+        if ($this->hasBranchFacilityColumn()) {
+            $branchQuery->where('facility_id', $facilityId);
+        }
+        $branches = $branchQuery->findAll();
+        $branchIds = array_map(static fn ($branch) => (int) ($branch->id ?? 0), $branches);
         if (empty($branchIds)) {
             return [
                 'facility'           => $facility,
@@ -115,9 +167,12 @@ class FacilityService
         }
 
         $totalCourts = $this->courtModel->whereIn('branch_id', $branchIds)->countAllResults();
-        $activeSessions = $this->courtSessionModel->whereIn('branch_id', $branchIds)
-            ->where('status', 'active')
-            ->countAllResults();
+        $activeSessions = 0;
+        if ($this->dbTableExists('court_sessions')) {
+            $activeSessions = $this->courtSessionModel->whereIn('branch_id', $branchIds)
+                ->where('status', 'active')
+                ->countAllResults();
+        }
         $maintenanceCourts = $this->courtModel->whereIn('branch_id', $branchIds)
             ->where('status', 'maintenance')
             ->countAllResults();
@@ -129,10 +184,13 @@ class FacilityService
             ->where('DATE(booking_date)', $today)
             ->countAllResults();
 
-        $onlineDevices = $this->courtDeviceModel
-            ->whereIn('branch_id', $branchIds)
-            ->where('status', 'online')
-            ->countAllResults();
+        $onlineDevices = 0;
+        if ($this->dbTableExists('court_devices')) {
+            $onlineDevices = $this->courtDeviceModel
+                ->whereIn('branch_id', $branchIds)
+                ->where('status', 'online')
+                ->countAllResults();
+        }
 
         return [
             'facility'          => $facility,
@@ -151,10 +209,29 @@ class FacilityService
 
     public function getBranchesByFacility(int $facilityId)
     {
-        return $this->branchModel->where('facility_id', $facilityId)
-            ->orderBy('branch_type', 'ASC')
+        $facility = $this->facilityModel->find($facilityId);
+        $query = $this->branchModel;
+        if ($this->hasBranchFacilityColumn()) {
+            $query->where('facility_id', $facilityId);
+        } elseif ($facility) {
+            $query->where('tenant_id', $facility->tenant_id);
+        }
+        if ($this->branchModel->db->fieldExists('branch_type', 'branches')) {
+            $query->orderBy('branch_type', 'ASC');
+        }
+        return $query
             ->orderBy('name', 'ASC')
             ->findAll();
+    }
+
+    private function hasBranchFacilityColumn(): bool
+    {
+        return $this->branchModel->db->fieldExists('facility_id', 'branches');
+    }
+
+    private function dbTableExists(string $table): bool
+    {
+        return $this->branchModel->db->tableExists($table);
     }
 
     public function getBranchById(int $id)

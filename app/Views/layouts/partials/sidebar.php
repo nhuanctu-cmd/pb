@@ -73,6 +73,12 @@ $menuGroups = [
         ['label' => 'Tournament Template', 'icon' => 'bi-copy', 'url' => '/admin/tournament-templates', 'active' => 'admin/tournament-templates', 'perm' => 'tournaments.view'],
         ['label' => 'TV / LED Board', 'icon' => 'bi-display', 'url' => '/live-scores/tv', 'active' => 'live-scores', 'perm' => 'tournaments.view', 'external' => true],
         ['label' => 'Hạng mục giải đấu', 'icon' => 'bi-bar-chart-steps', 'url' => '/admin/competitions', 'active' => 'admin/competitions', 'perm' => 'tournaments.view'],
+        ['label' => 'Tournament AI', 'icon' => 'bi-stars', 'url' => '/admin/ai-scheduling', 'active' => 'admin/ai-scheduling', 'perm' => 'tournaments.manage'],
+        ['label' => 'Livestream', 'icon' => 'bi-broadcast-pin', 'url' => '/admin/livestream', 'active' => 'admin/livestream', 'perm' => 'tournaments.manage'],
+        ['label' => 'Rating & Governance', 'icon' => 'bi-star', 'url' => '/admin/rating', 'active' => 'admin/rating', 'perm' => 'rating.view'],
+        ['label' => 'Match Governance', 'icon' => 'bi-gavel', 'url' => '/admin/governance', 'active' => 'admin/governance', 'perm' => 'rating.review'],
+        ['label' => 'Queue Monitoring', 'icon' => 'bi-list-check', 'url' => '/admin/queue', 'active' => 'admin/queue', 'perm' => 'dashboard.view'],
+        ['label' => 'Data Quality', 'icon' => 'bi-shield-check', 'url' => '/admin/data-quality', 'active' => 'admin/data-quality', 'perm' => 'dashboard.view'],
     ],
 
     'Membership + CRM thương mại' => [
@@ -83,6 +89,22 @@ $menuGroups = [
         ['label' => 'Thanh toán', 'icon' => 'bi-credit-card', 'url' => '/admin/payments', 'active' => 'admin/payments', 'perm' => 'payments.view'],
         ['label' => 'POS', 'icon' => 'bi-shop', 'url' => '/admin/pos', 'active' => 'admin/pos', 'perm' => 'pos.access'],
         ['label' => 'Điểm thưởng/referral', 'icon' => 'bi-gift', 'url' => '/admin/growth', 'active' => 'admin/growth', 'perm' => 'players.view'],
+    ],
+
+    'Đội ngũ & Vận động viên' => [
+        ['label' => 'Players', 'icon' => 'bi-person-badge', 'url' => '/admin/players', 'active' => 'admin/players', 'perm' => 'players.view'],
+        ['label' => 'Players dashboard', 'icon' => 'bi-person-vcard', 'url' => '/admin/players/dashboard', 'active' => 'admin/players/dashboard', 'perm' => 'players.view'],
+        ['label' => 'Player ranking', 'icon' => 'bi-trophy', 'url' => '/admin/players/ranking', 'active' => 'admin/players/ranking', 'perm' => 'players.view'],
+        ['label' => 'Clubs', 'icon' => 'bi-building-heart', 'url' => '/admin/clubs', 'active' => 'admin/clubs', 'perm' => 'clubs.view'],
+        ['label' => 'Teams', 'icon' => 'bi-people-fill', 'url' => '/admin/teams', 'active' => 'admin/teams', 'perm' => 'teams.view'],
+        ['label' => 'Matches', 'icon' => 'bi-controller', 'url' => '/admin/matches', 'active' => 'admin/matches', 'perm' => 'matches.view'],
+    ],
+
+    'Hoạt động mở rộng' => [
+        ['label' => 'Open Play', 'icon' => 'bi-people', 'url' => '/admin/open-play', 'active' => 'admin/open-play', 'perm' => 'bookings.view'],
+        ['label' => 'Coaching', 'icon' => 'bi-person-video3', 'url' => '/admin/coaching', 'active' => 'admin/coaching', 'perm' => 'bookings.view'],
+        ['label' => 'Media', 'icon' => 'bi-images', 'url' => '/admin/media', 'active' => 'admin/media', 'perm' => 'media.view'],
+        ['label' => 'Plans', 'icon' => 'bi-layers', 'url' => '/admin/plans', 'active' => 'admin/plans', 'perm' => 'plans.view'],
     ],
 
     'Cơ sở dữ liệu & Thiết lập' => [
@@ -239,4 +261,3 @@ foreach ($menuGroups as $group => $items) {
         <span><?= esc(lang('App.app_name')) ?> v<?= esc(lang('App.version')) ?></span>
     </div>
 </aside>
-

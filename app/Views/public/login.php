@@ -132,23 +132,30 @@
                             $isLocalHost = (
                                 strpos($host, 'localhost') !== false
                                 || strpos($host, '127.0.0.1') !== false
+                                || strpos($host, '192.168.') !== false
+                            );
+                            $showDemoAccounts = (
+                                $isLocalHost
+                                || strpos($host, 'pickleball.eraai.io.vn') !== false
+                                || request()->getGet('demo') === '1'
+                                || request()->getGet('debug') === '1'
                                 || ENVIRONMENT !== 'production'
                             );
                             ?>
-                            <?php if ($isLocalHost): ?>
+                            <?php if ($showDemoAccounts): ?>
                             <div class="demo-accounts mt-4 pt-3 border-top">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <span class="fw-bold text-secondary"><i class="bi bi-person-badge"></i> <?= lang('Auth.demoAccounts') ?></span>
-                                    <span class="text-muted" style="font-size:0.75rem"><?= lang('Auth.demoAccountsNote') ?></span>
+                                    <span class="fw-bold text-secondary">Tài khoản dùng thử</span>
+                                    <span class="text-muted" style="font-size:0.75rem">Nhấp để điền nhanh hoặc đăng nhập ngay</span>
                                 </div>
                                 <?php
                                 $demoAccounts = [
-                                    ['role' => lang('Auth.roleSuperAdmin'), 'email' => 'admin@pickleball.com',        'password' => 'admin123'],
-                                    ['role' => lang('Auth.roleOwner'),      'email' => 'owner@pickleballpro.com',     'password' => 'password'],
-                                    ['role' => lang('Auth.roleManager'),    'email' => 'manager@pickleballpro.com',   'password' => 'password'],
-                                    ['role' => lang('Auth.roleStaff'),      'email' => 'staff@pickleballpro.com',     'password' => 'password'],
-                                    ['role' => lang('Auth.roleReferee'),    'email' => 'referee@pickleballpro.com',   'password' => 'password'],
-                                    ['role' => lang('Auth.rolePlayer'),     'email' => 'player@pickleballpro.com',    'password' => 'password'],
+                                    ['role' => 'Quản trị hệ thống',       'email' => 'admin@pickleball.com',      'password' => 'admin123'],
+                                    ['role' => 'Chủ sân',                 'email' => 'owner@pickleballpro.com',   'password' => 'password'],
+                                    ['role' => 'Quản lý chi nhánh',       'email' => 'manager@pickleballpro.com', 'password' => 'password'],
+                                    ['role' => 'Nhân viên',               'email' => 'staff@pickleballpro.com',   'password' => 'password'],
+                                    ['role' => 'Trọng tài',               'email' => 'referee@pickleballpro.com', 'password' => 'password'],
+                                    ['role' => 'Người chơi',              'email' => 'player@pickleballpro.com',  'password' => 'password'],
                                 ];
                                 ?>
                                 <?php foreach ($demoAccounts as $acc): ?>

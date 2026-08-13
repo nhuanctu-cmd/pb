@@ -173,13 +173,31 @@ class FacilitiesController extends BaseController
     public function assignClub(int $id)
     {
         $tenantId = (int) current_tenant_id();
+        $startDate = trim((string) $this->request->getPost('start_date'));
+        $endDate = trim((string) $this->request->getPost('end_date'));
+        $revenueShareRaw = (string) $this->request->getPost('revenue_share');
+        $bookingPriority = (int) $this->request->getPost('booking_priority');
+        $allowedCourts = $this->request->getPost('allowed_courts');
+        $allowedHours = $this->request->getPost('allowed_hours');
+
+        $revenueShare = null;
+        if ($revenueShareRaw !== '') {
+            $revenueShare = is_numeric($revenueShareRaw) ? max(0, (float) $revenueShareRaw) : null;
+        }
+
         $result = $this->facilityService->assignClubToFacility(
             $id,
             (int) $this->request->getPost('club_id'),
             $tenantId,
             (int) user_id(),
             (bool) $this->request->getPost('is_primary'),
-            trim((string) $this->request->getPost('notes')) ?: null
+            trim((string) $this->request->getPost('notes')) ?: null,
+            $startDate ?: null,
+            $endDate ?: null,
+            $revenueShare,
+            $bookingPriority > 0 ? $bookingPriority : 0,
+            $allowedCourts,
+            $allowedHours
         );
         return redirect()->back()->with($result['success'] ? 'success' : 'error', $result['message']);
     }

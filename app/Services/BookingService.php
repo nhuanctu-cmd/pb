@@ -19,6 +19,9 @@ class BookingService
     protected CustomerService $customerService;
     protected PricingService $pricingService;
     protected BookingStateMachine $stateMachine;
+    protected bool $hasAutoReleaseAt = false;
+    protected bool $hasHoldUntil = false;
+    protected bool $hasIsHold = false;
 
     public function __construct()
     {
@@ -30,6 +33,14 @@ class BookingService
         $this->customerService   = new CustomerService();
         $this->pricingService    = new PricingService();
         $this->stateMachine      = new BookingStateMachine();
+        $this->refreshHoldColumns();
+    }
+
+    protected function refreshHoldColumns(): void
+    {
+        $this->hasAutoReleaseAt = $this->bookingModel->hasAutoReleaseAt();
+        $this->hasHoldUntil = $this->bookingModel->hasHoldUntil();
+        $this->hasIsHold = $this->bookingModel->hasIsHold();
     }
 
     /**
@@ -37,6 +48,7 @@ class BookingService
      */
     public function createBooking(array $data): array
     {
+        $this->refreshHoldColumns();
         $tenantId = (int) ($data['tenant_id'] ?? 0);
         $branchId = (int) ($data['branch_id'] ?? 0);
 
@@ -126,7 +138,7 @@ class BookingService
         $expiresAt = date('Y-m-d H:i:s', strtotime('+' . $expiryMinutes . ' minutes'));
 
         // Create booking
-        $bookingId = $this->bookingModel->insert([
+        $bookingData = [
             'tenant_id'       => $tenantId,
             'branch_id'       => $branchId,
             'player_id'       => $data['player_id'] ?? null,
@@ -150,12 +162,22 @@ class BookingService
             'recurring_pattern' => $data['recurring_pattern'] ?? null,
             'recurring_parent_id' => $data['recurring_parent_id'] ?? null,
             'expires_at'      => $expiresAt,
-            'hold_until'      => $data['hold_until'] ?? null,
-            'is_hold'         => (int) ($data['is_hold'] ?? 0),
             'timeout_minutes' => (int) ($data['timeout_minutes'] ?? $expiryMinutes),
-            'auto_release_at' => $data['auto_release_at'] ?? null,
             'created_by'      => $data['created_by'] ?? null,
-        ]);
+        ];
+
+        if ($this->hasIsHold) {
+            $bookingData['is_hold'] = (int) ($data['is_hold'] ?? 0);
+        }
+
+        if ($this->hasHoldUntil) {
+            $bookingData['hold_until'] = $data['hold_until'] ?? null;
+        }
+        if ($this->hasAutoReleaseAt) {
+            $bookingData['auto_release_at'] = $data['auto_release_at'] ?? null;
+        }
+
+        $bookingId = $this->bookingModel->insert($bookingData);
 
         if (!$bookingId) {
             $db->transRollback();
@@ -308,12 +330,15 @@ class BookingService
      */
     public function holdBooking(array $data): array
     {
+        $this->refreshHoldColumns();
         $timeoutMinutes = max(1, (int) ($data['timeout_minutes'] ?? 5));
         $data['status'] = 'hold';
         $data['is_hold'] = 1;
         $data['timeout_minutes'] = $timeoutMinutes;
         $data['hold_until'] = date('Y-m-d H:i:s', time() + ($timeoutMinutes * 60));
-        $data['auto_release_at'] = $data['hold_until'];
+        if ($this->hasAutoReleaseAt) {
+            $data['auto_release_at'] = $data['hold_until'];
+        }
         return $this->createBooking($data);
     }
 
@@ -322,6 +347,7 @@ class BookingService
      */
     public function holdBookingById(int $bookingId, int $timeoutMinutes = 5, ?int $userId = null, ?int $tenantId = null): array
     {
+        $this->refreshHoldColumns();
         $db = \Config\Database::connect();
         $db->transStart();
         $booking = $this->findBookingForContext($bookingId, $tenantId, true);
@@ -347,15 +373,22 @@ class BookingService
         $now = date('Y-m-d H:i:s');
         $holdUntil = date('Y-m-d H:i:s', time() + ($timeoutMinutes * 60));
 
-        $this->bookingModel->update($bookingId, [
+        $holdUpdateData = [
             'status' => 'hold',
-            'is_hold' => 1,
             'timeout_minutes' => $timeoutMinutes,
-            'hold_until' => $holdUntil,
-            'auto_release_at' => $holdUntil,
             'updated_by' => $userId,
             'updated_at' => $now,
-        ]);
+        ];
+        if ($this->hasIsHold) {
+            $holdUpdateData['is_hold'] = 1;
+        }
+        if ($this->hasHoldUntil) {
+            $holdUpdateData['hold_until'] = $holdUntil;
+        }
+        if ($this->hasAutoReleaseAt) {
+            $holdUpdateData['auto_release_at'] = $holdUntil;
+        }
+        $this->bookingModel->update($bookingId, $holdUpdateData);
         $this->bookingLogModel->addLog(
             $booking->tenant_id,
             $bookingId,
@@ -383,6 +416,7 @@ class BookingService
      */
     public function releaseHoldById(int $bookingId, ?int $userId = null, ?int $tenantId = null): array
     {
+        $this->refreshHoldColumns();
         $db = \Config\Database::connect();
         $db->transStart();
         $booking = $this->findBookingForContext($bookingId, $tenantId, true);
@@ -403,14 +437,21 @@ class BookingService
             return ['success' => false, 'message' => lang('App.invalid_data')];
         }
 
-        $this->bookingModel->update($bookingId, [
+        $releaseUpdateData = [
             'status' => 'reserved',
-            'is_hold' => 0,
-            'auto_release_at' => null,
-            'hold_until' => null,
             'updated_by' => $userId,
             'updated_at' => date('Y-m-d H:i:s'),
-        ]);
+        ];
+        if ($this->hasIsHold) {
+            $releaseUpdateData['is_hold'] = 0;
+        }
+        if ($this->hasHoldUntil) {
+            $releaseUpdateData['hold_until'] = null;
+        }
+        if ($this->hasAutoReleaseAt) {
+            $releaseUpdateData['auto_release_at'] = null;
+        }
+        $this->bookingModel->update($bookingId, $releaseUpdateData);
         $this->bookingLogModel->addLog(
             $booking->tenant_id,
             $bookingId,
@@ -510,6 +551,7 @@ class BookingService
      */
     public function cancelBooking(int $bookingId, ?string $reason = null, ?int $userId = null, ?int $tenantId = null): array
     {
+        $this->refreshHoldColumns();
         $db = \Config\Database::connect();
         $db->transStart();
         $booking = $this->findBookingForContext($bookingId, $tenantId, true);
@@ -527,14 +569,17 @@ class BookingService
             return ['success' => false, 'message' => lang('App.cannot_cancel_booking')];
         }
 
-        $this->bookingModel->update($bookingId, [
+        $cancelUpdateData = [
             'status'           => $newStatus,
             'payment_status'   => $newStatus === 'refunded' ? 'refunded' : 'unpaid',
             'cancelled_at'     => date('Y-m-d H:i:s'),
             'cancelled_reason' => $reason,
-            'is_hold'          => 0,
             'updated_by'       => $userId,
-        ]);
+        ];
+        if ($this->hasIsHold) {
+            $cancelUpdateData['is_hold'] = 0;
+        }
+        $this->bookingModel->update($bookingId, $cancelUpdateData);
         $this->bookingItemModel->where('booking_id', $bookingId)
             ->where('status', 'active')
             ->set(['status' => 'cancelled', 'updated_at' => date('Y-m-d H:i:s')])
@@ -914,12 +959,17 @@ class BookingService
                 continue;
             }
 
-            $this->bookingModel->update($booking->id, [
+            $expiredUpdateData = [
                 'status'          => 'expired',
                 'cancelled_reason' => lang('App.auto_cancelled_expired'),
                 'cancelled_at'    => date('Y-m-d H:i:s'),
-                'is_hold'         => 0,
-            ]);
+            ];
+            // Legacy installations can operate holds from status + timeout
+            // without the optional `is_hold` flag.
+            if ($this->bookingModel->hasIsHold()) {
+                $expiredUpdateData['is_hold'] = 0;
+            }
+            $this->bookingModel->update($booking->id, $expiredUpdateData);
 
             $this->bookingItemModel->where('booking_id', $booking->id)
                                    ->where('status', 'active')

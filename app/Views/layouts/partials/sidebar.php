@@ -268,6 +268,21 @@ $allMenu = [
                 ['label' => 'CRM Campaign', 'icon' => 'bi-megaphone-fill', 'url' => '/admin/crm-campaigns', 'active' => 'admin/crm-campaigns', 'perm' => 'players.view'],
             ],
         ],
+        [
+            'label' => 'Public & API (M15)',
+            'icon'  => 'bi-globe2',
+            'url'   => '/venues',
+            'active'=> 'venues',
+            'perm'  => 'dashboard.view',
+            'children' => [
+                ['label' => 'Public Venue', 'icon' => 'bi-layout-text-sidebar-reverse', 'url' => '/venues', 'active' => 'venues', 'perm' => 'dashboard.view', 'external' => true],
+                ['label' => 'Public Club', 'icon' => 'bi-building-heart', 'url' => '/clubs', 'active' => 'clubs', 'perm' => 'dashboard.view', 'external' => true],
+                ['label' => 'Facilities API', 'icon' => 'bi-terminal', 'url' => '/api/v1/facilities?tenant_id=' . (int) ($currentTenantId ?: 1), 'active' => 'api/v1/facilities', 'perm' => 'dashboard.view', 'external' => true],
+                ['label' => 'Branches API', 'icon' => 'bi-terminal', 'url' => '/api/v1/branches?tenant_id=' . (int) ($currentTenantId ?: 1), 'active' => 'api/v1/branches', 'perm' => 'dashboard.view', 'external' => true],
+                ['label' => 'Courts API', 'icon' => 'bi-terminal', 'url' => '/api/v1/courts?tenant_id=' . (int) ($currentTenantId ?: 1), 'active' => 'api/v1/courts', 'perm' => 'dashboard.view', 'external' => true],
+                ['label' => 'Security / Audit', 'icon' => 'bi-shield-lock', 'url' => '/admin/audit-logs', 'active' => 'admin/audit-logs', 'perm' => 'audit-logs.view'],
+            ],
+        ],
 
         [
             'label' => lang('App.menu_pricing_rules'),

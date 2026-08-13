@@ -11,6 +11,7 @@ class ApiAuthFilter implements FilterInterface
     public function before(RequestInterface $request, $arguments = null)
     {
         $token = $request->getHeaderLine('Authorization');
+        $requestedTenant = $this->extractTenantIdFromRequest($request);
 
         // Check Bearer token
         if (!empty($token) && preg_match('/Bearer\s(\S+)/', $token, $matches)) {
@@ -21,6 +22,15 @@ class ApiAuthFilter implements FilterInterface
                 // Set user info for the request
                 $request->api_user_id = $payload['user_id'] ?? null;
                 $request->api_tenant_id = $payload['tenant_id'] ?? null;
+                if ($requestedTenant !== null && $request->api_tenant_id !== null && (int) $requestedTenant !== (int) $request->api_tenant_id) {
+                    return service('response')
+                        ->setStatusCode(ResponseInterface::HTTP_FORBIDDEN)
+                        ->setJSON([
+                            'status'  => 403,
+                            'message' => lang('App.forbidden'),
+                            'errors'  => ['tenant_id' => 'tenant_id không thuộc phạm vi token.'],
+                        ]);
+                }
                 return;
             }
         }
@@ -33,6 +43,15 @@ class ApiAuthFilter implements FilterInterface
             if ($user) {
                 $request->api_user_id = $user->id;
                 $request->api_tenant_id = $user->tenant_id;
+                if ($requestedTenant !== null && $request->api_tenant_id !== null && (int) $requestedTenant !== (int) $request->api_tenant_id) {
+                    return service('response')
+                        ->setStatusCode(ResponseInterface::HTTP_FORBIDDEN)
+                        ->setJSON([
+                            'status'  => 403,
+                            'message' => lang('App.forbidden'),
+                            'errors'  => ['tenant_id' => 'tenant_id không thuộc phạm vi token.'],
+                        ]);
+                }
                 return;
             }
         }
@@ -77,6 +96,18 @@ class ApiAuthFilter implements FilterInterface
         } catch (\Exception $e) {
             return null;
         }
+    }
+
+    private function extractTenantIdFromRequest(RequestInterface $request): ?int
+    {
+        $tenantId = $request->getGet('tenant_id') ?? $request->getPost('tenant_id');
+        if ($tenantId === null) {
+            $tenantId = $request->getHeaderLine('X-Tenant-Id');
+        }
+        if ($tenantId === null || $tenantId === '') {
+            return null;
+        }
+        return is_numeric($tenantId) ? (int) $tenantId : null;
     }
 
     public static function generateToken(array $payload): string

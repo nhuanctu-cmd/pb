@@ -79,17 +79,46 @@ class TournamentTemplateService
         }
 
         $snapshot = json_decode((string) $template->snapshot, true) ?: [];
+        $startDate = $this->nullIfEmpty($overrides['start_date'] ?? null);
+        $endDate = $this->nullIfEmpty($overrides['end_date'] ?? null);
+        if (! $startDate) {
+            return ['success' => false, 'message' => 'Vui lòng chọn ngày bắt đầu.'];
+        }
+        if (! $endDate) {
+            $endDate = $startDate;
+        }
+
+        $openNow = (bool) ($overrides['open_registration_now'] ?? false);
+        $registrationStart = $this->nullIfEmpty($overrides['registration_start'] ?? null);
+        $registrationEnd = $this->nullIfEmpty($overrides['registration_end'] ?? null);
+        if ($openNow && ! $registrationStart) {
+            $registrationStart = date('Y-m-d H:i:s');
+        }
+        if ($openNow && ! $registrationEnd) {
+            $registrationEnd = $startDate . ' 23:59:59';
+        }
+        if (! $registrationStart || ! $registrationEnd) {
+            $registrationStart = $registrationStart ?: null;
+            $registrationEnd = $registrationEnd ?: null;
+        }
+
         $payload = array_merge($snapshot, $overrides, [
             'tenant_id' => $tenantId,
             'status' => $overrides['status'] ?? 'draft',
             'slug_vi' => null,
             'slug_en' => null,
-            'start_date' => $overrides['start_date'] ?? null,
-            'end_date' => $overrides['end_date'] ?? null,
-            'registration_start' => $overrides['registration_start'] ?? null,
-            'registration_end' => $overrides['registration_end'] ?? null,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'registration_start' => $registrationStart,
+            'registration_end' => $registrationEnd,
+            'open_registration_now' => null,
         ]);
 
         return (new TournamentService())->createTournament($payload);
+    }
+
+    private function nullIfEmpty($value)
+    {
+        return $value === '' || $value === null ? null : $value;
     }
 }

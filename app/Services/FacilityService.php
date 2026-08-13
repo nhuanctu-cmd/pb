@@ -73,27 +73,88 @@ class FacilityService
         return $this->facilityClubAssignmentModel->getForFacility($facilityId, $tenantId, $activeOnly);
     }
 
-    public function assignClubToFacility(int $facilityId, int $clubId, int $tenantId, int $actorId = 0, bool $primary = false, ?string $notes = null): array
-    {
+    public function assignClubToFacility(
+        int $facilityId,
+        int $clubId,
+        int $tenantId,
+        int $actorId = 0,
+        bool $primary = false,
+        ?string $notes = null,
+        ?string $startDate = null,
+        ?string $endDate = null,
+        ?float $revenueShare = null,
+        int $bookingPriority = 0,
+        $allowedCourts = null,
+        $allowedHours = null
+    ): array {
         if (! $this->facilityModel->findForTenant($facilityId, $tenantId)) return ['success' => false, 'message' => 'Cụm sân không thuộc tenant hiện tại.'];
         if (! $this->clubModel->findForTenant($clubId, $tenantId)) return ['success' => false, 'message' => 'CLB không thuộc tenant hiện tại.'];
         if (! $this->facilityClubAssignmentModel->db->tableExists('facility_club_assignments')) return ['success' => false, 'message' => 'Chưa có schema gán CLB cho cụm sân.'];
 
         $db = $this->facilityClubAssignmentModel->db;
         $db->transStart();
-        if ($primary) $db->table('facility_club_assignments')->where('tenant_id', $tenantId)->where('facility_id', $facilityId)->update(['is_primary' => 0, 'updated_by' => $actorId ?: null, 'updated_at' => date('Y-m-d H:i:s')]);
-        $existing = $db->table('facility_club_assignments')->where('tenant_id', $tenantId)->where('facility_id', $facilityId)->where('club_id', $clubId)->get()->getRow();
-        $data = ['tenant_id' => $tenantId, 'facility_id' => $facilityId, 'club_id' => $clubId, 'status' => 'active', 'is_primary' => $primary ? 1 : (int) ($existing->is_primary ?? 0), 'notes' => $notes, 'updated_by' => $actorId ?: null, 'updated_at' => date('Y-m-d H:i:s')];
-        if ($existing) $db->table('facility_club_assignments')->where('id', $existing->id)->update($data);
-        else $db->table('facility_club_assignments')->insert($data + ['created_by' => $actorId ?: null, 'created_at' => date('Y-m-d H:i:s')]);
+        if ($primary) {
+            $db->table('facility_club_assignments')
+                ->where('tenant_id', $tenantId)
+                ->where('facility_id', $facilityId)
+                ->update(['is_primary' => 0, 'updated_by' => $actorId ?: null, 'updated_at' => date('Y-m-d H:i:s')]);
+        }
+
+        $existing = $db->table('facility_club_assignments')
+            ->where('tenant_id', $tenantId)
+            ->where('facility_id', $facilityId)
+            ->where('club_id', $clubId)
+            ->get()->getRow();
+
+        $data = [
+            'tenant_id'        => $tenantId,
+            'facility_id'      => $facilityId,
+            'club_id'          => $clubId,
+            'status'           => 'active',
+            'is_primary'       => $primary ? 1 : (int) ($existing->is_primary ?? 0),
+            'start_date'       => $startDate ?: null,
+            'end_date'         => $endDate ?: null,
+            'revenue_share'    => $revenueShare,
+            'booking_priority' => $bookingPriority,
+            'allowed_courts'   => $this->normalizeJson($allowedCourts),
+            'allowed_hours'    => $this->normalizeJson($allowedHours),
+            'notes'            => $notes,
+            'updated_by'       => $actorId ?: null,
+            'updated_at'       => date('Y-m-d H:i:s'),
+        ];
+
+        if ($existing) {
+            $db->table('facility_club_assignments')->where('id', $existing->id)->update($data);
+        } else {
+            $db->table('facility_club_assignments')->insert($data + ['created_by' => $actorId ?: null, 'created_at' => date('Y-m-d H:i:s')]);
+        }
+
         $db->transComplete();
-        return ['success' => $db->transStatus(), 'message' => $db->transStatus() ? 'Đã gán CLB vào cụm sân.' : 'Không thể gán CLB vào cụm sân.'];
+        return [
+            'success' => $db->transStatus(),
+            'message' => $db->transStatus() ? 'Đã gán CLB vào cụm sân.' : 'Không thể gán CLB vào cụm sân.'
+        ];
     }
 
     public function removeClubFromFacility(int $assignmentId, int $tenantId, int $actorId = 0): bool
     {
         if (! $this->facilityClubAssignmentModel->db->tableExists('facility_club_assignments')) return false;
         return (bool) $this->facilityClubAssignmentModel->where('id', $assignmentId)->where('tenant_id', $tenantId)->update(['status' => 'inactive', 'updated_by' => $actorId ?: null, 'updated_at' => date('Y-m-d H:i:s')]);
+    }
+
+    private function normalizeJson($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (is_string($value)) {
+            $value = trim($value);
+            return $value === '' ? null : $value;
+        }
+        if (is_array($value)) {
+            return json_encode(array_values($value), JSON_UNESCAPED_UNICODE);
+        }
+        return (string) $value;
     }
 
     public function getFacilityById(int $id)

@@ -9,7 +9,11 @@ class FacilityClubAssignmentModel extends Model
     protected $table = 'facility_club_assignments';
     protected $primaryKey = 'id';
     protected $returnType = 'object';
-    protected $allowedFields = ['tenant_id', 'facility_id', 'club_id', 'status', 'is_primary', 'notes', 'created_by', 'updated_by'];
+    protected $allowedFields = [
+        'tenant_id', 'facility_id', 'club_id', 'status', 'is_primary', 'start_date', 'end_date',
+        'revenue_share', 'booking_priority', 'allowed_courts', 'allowed_hours', 'notes',
+        'created_by', 'updated_by'
+    ];
     protected $useTimestamps = true;
     protected $createdField = 'created_at';
     protected $updatedField = 'updated_at';

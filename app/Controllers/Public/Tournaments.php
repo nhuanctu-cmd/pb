@@ -71,10 +71,36 @@ class Tournaments extends BaseController
         if (! $tournament) {
             throw \CodeIgniter\Exceptions\PageNotFoundException::forPageNotFound();
         }
+        $liveScoreService = service('liveScoreService');
+        $queryOptions = $liveScoreService->tvQueryDefaults($this->request->getGet() ?? []);
+        $queryOptions['sequence'] = $this->normalizeSequence((string) $this->request->getGet('sequence')) ?: 'live,next,call,results';
+
         return view('public/live_scores/tv', [
             'pageTitle' => $this->localized($tournament, 'name') . ' · TV',
-            'data' => service('liveScoreService')->getTvDisplayData((int) $tournament->tenant_id, (int) $tournament->id),
+            'data' => $liveScoreService->getTvDisplayData((int) $tournament->tenant_id, (int) $tournament->id, $queryOptions) + [
+                'api_endpoint' => $this->buildTvApiEndpoint((int) $tournament->tenant_id, (int) $tournament->id, $queryOptions),
+            ],
         ]);
+    }
+
+    private function buildTvApiEndpoint(int $tenantId, int $tournamentId, array $options): string
+    {
+        $query = [
+            'tenant_id' => $tenantId,
+            'tournament_id' => $tournamentId,
+            'sequence' => $options['sequence'] ?? 'live,next,call,results',
+            'refresh' => is_numeric($options['refresh_seconds'] ?? null) ? (int) $options['refresh_seconds'] : null,
+            'branch_id' => is_numeric($options['branch_id'] ?? null) ? (int) $options['branch_id'] : null,
+            'date' => $options['date'] ?? null,
+        ];
+        $query = array_filter($query, static fn ($value) => $value !== null && $value !== '' && $value !== false);
+
+        return base_url('api/v1/live-scores/tv?' . http_build_query($query));
+    }
+
+    private function normalizeSequence(?string $raw): string
+    {
+        return $raw ? implode(',', array_filter(array_map('trim', preg_split('/\s*,\s*/', trim($raw), -1, PREG_SPLIT_NO_EMPTY)))) : '';
     }
 
     public function submitRegistration(string $slug)

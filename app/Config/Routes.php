@@ -9,9 +9,20 @@ $routes->get('/', 'Home::index');
 $routes->get('/ranking', 'PublicPortal::ranking', ['namespace' => 'App\Controllers\Public']);
 $routes->get('/players', 'PublicPortal::players', ['namespace' => 'App\Controllers\Public']);
 $routes->get('/players/(:segment)', 'PublicPortal::player/$1', ['namespace' => 'App\Controllers\Public']);
+$routes->get('/venues', 'PublicPortal::venues', ['namespace' => 'App\Controllers\Public']);
+$routes->get('/venues/(:segment)/courts', 'PublicPortal::venue/$1', ['namespace' => 'App\Controllers\Public']);
+$routes->get('/venues/(:segment)/schedule', 'PublicPortal::venue/$1', ['namespace' => 'App\Controllers\Public']);
+$routes->get('/venues/(:segment)/members', 'PublicPortal::venue/$1', ['namespace' => 'App\Controllers\Public']);
+$routes->get('/venues/(:segment)/history', 'PublicPortal::venue/$1', ['namespace' => 'App\Controllers\Public']);
+$routes->get('/venues/(:segment)', 'PublicPortal::venue/$1', ['namespace' => 'App\Controllers\Public']);
 $routes->get('/articles/(:num)', 'PublicPortal::article/$1', ['namespace' => 'App\Controllers\Public']);
 $routes->get('/matches', 'PublicPortal::matches', ['namespace' => 'App\Controllers\Public']);
 $routes->get('/clubs', 'PublicPortal::clubs', ['namespace' => 'App\Controllers\Public']);
+$routes->get('/clubs/(:segment)/members', 'PublicPortal::clubMembers/$1', ['namespace' => 'App\Controllers\Public']);
+$routes->get('/clubs/(:segment)/history', 'PublicPortal::clubHistory/$1', ['namespace' => 'App\Controllers\Public']);
+$routes->get('/clubs/(:segment)/posts', 'PublicPortal::clubPosts/$1', ['namespace' => 'App\Controllers\Public']);
+$routes->get('/clubs/(:segment)/tournaments', 'PublicPortal::clubTournaments/$1', ['namespace' => 'App\Controllers\Public']);
+$routes->get('/clubs/(:segment)', 'PublicPortal::club/$1', ['namespace' => 'App\Controllers\Public']);
 $routes->get('/calendar', 'PublicPortal::calendar', ['namespace' => 'App\Controllers\Public']);
 $routes->get('/live', 'PublicPortal::live', ['namespace' => 'App\Controllers\Public']);
 $routes->get('/verify', 'PublicPortal::verify', ['namespace' => 'App\Controllers\Public']);
@@ -74,38 +85,37 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api'], function ($rout
     $routes->get('live-scores/bracket', 'LiveScores::bracket');
     $routes->get('network/clubs', 'PlatformClubApi::index');
 
-        // Facility API routes
-        $routes->get('facilities', 'FacilityApi::index');
-        $routes->get('facilities/(:num)', 'FacilityApi::show/$1');
-        $routes->get('facilities/(:num)/dashboard', 'FacilityApi::dashboard/$1');
-    $routes->get('facilities/(:num)/branches', 'FacilityApi::branches/$1');
-    $routes->get('facilities/(:num)/clubs', 'FacilityApi::clubs/$1');
-        $routes->get('facilities/branch/(:num)', 'FacilityApi::branchDetail/$1');
-        $routes->get('facilities/branch/(:num)/hours', 'FacilityApi::branchOpeningHours/$1');
-        $routes->get('facilities/branch/(:num)/holidays', 'FacilityApi::branchHolidays/$1');
-
-        // Court API routes
-        $routes->get('facilities/court-types', 'FacilityApi::courtTypes');
-        $routes->get('facilities/court-statuses', 'FacilityApi::courtStatuses');
-        $routes->get('facilities/branch/(:num)/courts', 'FacilityApi::courts/$1');
-        $routes->get('facilities/court/(:num)', 'FacilityApi::courtDetail/$1');
-
-        // Realtime API routes
-        $routes->get('facilities/branch/(:num)/realtime', 'FacilityApi::realtimeStatus/$1');
-        $routes->get('facilities/branch/(:num)/sessions', 'FacilityApi::activeSessions/$1');
-        $routes->get('facilities/branch/(:num)/timeline', 'FacilityApi::courtTimeline/$1');
-
-        // Device API routes
-        $routes->get('facilities/branch/(:num)/devices', 'FacilityApi::devices/$1');
-        $routes->get('facilities/device/(:num)', 'FacilityApi::deviceDetail/$1');
-        $routes->get('facilities/device/(:num)/logs', 'FacilityApi::deviceLogs/$1');
-
-        // Report API routes
-        $routes->get('facilities/branch/(:num)/report', 'FacilityApi::report/$1');
-        $routes->get('facilities/branch/(:num)/peak-hours', 'FacilityApi::peakHours/$1');
-        $routes->get('facilities/branch/(:num)/court-ranking', 'FacilityApi::courtRanking/$1');
-        $routes->get('facilities/branch/(:num)/revenue', 'FacilityApi::revenueByCourt/$1');
-        $routes->get('facilities/branch/(:num)/utilization', 'FacilityApi::utilization/$1');
+        // Facility/Court API routes (protected API layer)
+        $routes->get('facilities', 'FacilityApi::index', ['filter' => 'apiauth']);
+        $routes->get('facilities/(:num)', 'FacilityApi::show/$1', ['filter' => 'apiauth']);
+        $routes->get('facilities/(:num)/dashboard', 'FacilityApi::dashboard/$1', ['filter' => 'apiauth']);
+        $routes->post('facilities/(:num)/clubs', 'FacilityApi::assignClub/$1', ['filter' => 'apiauth']);
+        $routes->delete('facilities/(:num)/clubs/(:num)', 'FacilityApi::removeClubAssignment/$1/$2', ['filter' => 'apiauth']);
+        $routes->post('facilities', 'FacilityApi::create', ['filter' => 'apiauth']);
+        $routes->put('facilities/(:num)', 'FacilityApi::update/$1', ['filter' => 'apiauth']);
+        $routes->patch('facilities/(:num)', 'FacilityApi::update/$1', ['filter' => 'apiauth']);
+        $routes->delete('facilities/(:num)', 'FacilityApi::delete/$1', ['filter' => 'apiauth']);
+        $routes->get('facilities/(:num)/branches', 'FacilityApi::branches/$1', ['filter' => 'apiauth']);
+        $routes->get('facilities/(:num)/clubs', 'FacilityApi::clubs/$1', ['filter' => 'apiauth']);
+        $routes->get('facilities/branch/(:num)', 'FacilityApi::branchDetail/$1', ['filter' => 'apiauth']);
+        $routes->get('facilities/branch/(:num)/hours', 'FacilityApi::branchOpeningHours/$1', ['filter' => 'apiauth']);
+        $routes->get('facilities/branch/(:num)/holidays', 'FacilityApi::branchHolidays/$1', ['filter' => 'apiauth']);
+        $routes->get('facilities/court-types', 'FacilityApi::courtTypes', ['filter' => 'apiauth']);
+        $routes->get('facilities/court-statuses', 'FacilityApi::courtStatuses', ['filter' => 'apiauth']);
+        $routes->get('facilities/branch/(:num)/courts', 'FacilityApi::courts/$1', ['filter' => 'apiauth']);
+        $routes->get('facilities/court/(:num)', 'FacilityApi::courtDetail/$1', ['filter' => 'apiauth']);
+        $routes->get('facilities/branch/(:num)/realtime', 'FacilityApi::realtimeStatus/$1', ['filter' => 'apiauth']);
+        $routes->get('facilities/branch/(:num)/sessions', 'FacilityApi::activeSessions/$1', ['filter' => 'apiauth']);
+        $routes->get('facilities/branch/(:num)/timeline', 'FacilityApi::courtTimeline/$1', ['filter' => 'apiauth']);
+        $routes->get('facilities/branch/(:num)/devices', 'FacilityApi::devices/$1', ['filter' => 'apiauth']);
+        $routes->get('facilities/device/(:num)', 'FacilityApi::deviceDetail/$1', ['filter' => 'apiauth']);
+        $routes->get('facilities/device/(:num)/logs', 'FacilityApi::deviceLogs/$1', ['filter' => 'apiauth']);
+        $routes->get('facilities/branch/(:num)/report', 'FacilityApi::report/$1', ['filter' => 'apiauth']);
+        $routes->get('facilities/branch/(:num)/peak-hours', 'FacilityApi::peakHours/$1', ['filter' => 'apiauth']);
+        $routes->get('facilities/branch/(:num)/court-ranking', 'FacilityApi::courtRanking/$1', ['filter' => 'apiauth']);
+        $routes->get('facilities/branch/(:num)/revenue', 'FacilityApi::revenueByCourt/$1', ['filter' => 'apiauth']);
+        $routes->get('facilities/branch/(:num)/utilization', 'FacilityApi::utilization/$1', ['filter' => 'apiauth']);
+        $routes->post('facilities/device/(:num)/toggle', 'FacilityApi::toggleDevice/$1', ['filter' => 'apiauth']);
 
         // Protected API routes
         $routes->group('', ['filter' => 'apiauth'], function ($routes) {
@@ -113,15 +123,39 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api'], function ($rout
         $routes->get('tenants/(:num)', 'TenantApi::show/$1');
         $routes->get('branches', 'BranchApi::index');
         $routes->get('branches/(:num)', 'BranchApi::show/$1');
+        $routes->post('branches', 'BranchApi::create');
+        $routes->put('branches/(:num)', 'BranchApi::update/$1');
+        $routes->patch('branches/(:num)', 'BranchApi::update/$1');
+        $routes->delete('branches/(:num)', 'BranchApi::delete/$1');
         $routes->get('users/profile', 'UserApi::profile');
         $routes->get('users/(:num)', 'UserApi::show/$1');
         $routes->get('settings', 'SettingApi::index');
+        $routes->get('clubs', 'ClubApi::index');
+        $routes->get('clubs/(:num)', 'ClubApi::show/$1');
+        $routes->post('clubs', 'ClubApi::create');
+        $routes->put('clubs/(:num)', 'ClubApi::update/$1');
+        $routes->patch('clubs/(:num)', 'ClubApi::update/$1');
+        $routes->delete('clubs/(:num)', 'ClubApi::delete/$1');
+        $routes->get('clubs/(:num)/members', 'ClubApi::members/$1');
+        $routes->get('clubs/(:num)/memberships', 'ClubApi::members/$1');
+        $routes->post('clubs/(:num)/members', 'ClubApi::storeMembership/$1');
+        $routes->post('clubs/(:num)/memberships', 'ClubApi::storeMembership/$1');
+        $routes->delete('clubs/(:num)/members/(:num)', 'ClubApi::removeMembership/$1/$2');
+        $routes->post('clubs/(:num)/memberships/invite', 'ClubApi::inviteMembership/$1');
+        $routes->post('clubs/(:num)/memberships/(:num)/approve', 'ClubApi::approveMembership/$1/$2');
+        $routes->post('clubs/(:num)/memberships/(:num)/reject', 'ClubApi::rejectMembership/$1/$2');
+        $routes->post('clubs/(:num)/memberships/(:num)/suspend', 'ClubApi::suspendMembership/$1/$2');
+        $routes->get('clubs/(:num)/memberships/history', 'ClubApi::membershipHistory/$1');
         $routes->get('court-types', 'CourtApi::courtTypes');
         $routes->get('courts/available', 'CourtApi::available');
         $routes->get('courts', 'CourtApi::index');
         $routes->get('courts/(:num)', 'CourtApi::show/$1');
+        $routes->get('courts/(:num)/availability', 'CourtApi::availability/$1');
         $routes->get('branches/(:num)/courts', 'CourtApi::getByBranch/$1');
-        $routes->post('facilities/device/(:num)/toggle', 'FacilityApi::toggleDevice/$1');
+        $routes->post('courts', 'CourtApi::create');
+        $routes->put('courts/(:num)', 'CourtApi::update/$1');
+        $routes->patch('courts/(:num)', 'CourtApi::update/$1');
+        $routes->delete('courts/(:num)', 'CourtApi::delete/$1');
 
         // Tournament scheduling API routes
         $routes->post('tournaments/(:num)/auto-schedule', 'TournamentSchedulerApi::autoSchedule/$1');
@@ -202,6 +236,7 @@ $routes->group('admin', ['namespace' => 'App\Controllers\Admin'], function ($rou
     $routes->group('', ['filter' => 'auth'], function ($routes) {
         $routes->get('rating', 'RatingGovernanceController::index', ['filter' => 'permission:rating.view']);
         $routes->get('venue-operations', 'VenueOperationsController::index', ['filter' => 'permission:facilities.view']);
+        $routes->get('venue-operations/data', 'VenueOperationsController::data', ['filter' => 'permission:facilities.view']);
         $routes->get('data-quality', 'DataQualityController::index', ['filter' => 'permission:dashboard.view']);
         $routes->get('governance', 'GovernanceController::index', ['filter' => 'permission:rating.review']);
         $routes->post('governance/disputes/(:num)/resolve', 'GovernanceController::resolveDispute/$1', ['filter' => 'permission:rating.review']);

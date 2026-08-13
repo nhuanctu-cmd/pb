@@ -6,6 +6,11 @@ use CodeIgniter\Model;
 
 class BookingModel extends Model
 {
+    private bool $hasAutoReleaseAt = false;
+    private bool $hasHoldUntil = false;
+    private bool $hasIsHold = false;
+    private array $columnExistsCache = [];
+
     protected $table            = 'bookings';
     protected $primaryKey       = 'id';
     protected $useAutoIncrement = true;
@@ -68,6 +73,51 @@ class BookingModel extends Model
     protected $afterFind      = [];
     protected $beforeDelete   = [];
     protected $afterDelete    = ['logAudit'];
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->refreshHoldColumns();
+    }
+
+    protected function refreshHoldColumns(): void
+    {
+        $this->columnExistsCache = [];
+        $this->hasAutoReleaseAt = $this->hasColumn('auto_release_at');
+        $this->hasHoldUntil = $this->hasColumn('hold_until');
+        $this->hasIsHold = $this->hasColumn('is_hold');
+    }
+
+    protected function hasColumn(string $column): bool
+    {
+        if (! array_key_exists($column, $this->columnExistsCache)) {
+            try {
+                $this->columnExistsCache[$column] = (bool) $this->db->fieldExists($column, $this->table);
+            } catch (\Throwable) {
+                $this->columnExistsCache[$column] = false;
+            }
+        }
+
+        return (bool) $this->columnExistsCache[$column];
+    }
+
+    public function hasAutoReleaseAt(): bool
+    {
+        $this->hasAutoReleaseAt = $this->hasColumn('auto_release_at');
+        return $this->hasAutoReleaseAt;
+    }
+
+    public function hasHoldUntil(): bool
+    {
+        $this->hasHoldUntil = $this->hasColumn('hold_until');
+        return $this->hasHoldUntil;
+    }
+
+    public function hasIsHold(): bool
+    {
+        $this->hasIsHold = $this->hasColumn('is_hold');
+        return $this->hasIsHold;
+    }
 
     public function logAudit(array $data)
     {
@@ -222,18 +272,31 @@ class BookingModel extends Model
     public function getExpiredPending()
     {
         $now = date('Y-m-d H:i:s');
-        return $this->groupStart()
+        $this->refreshHoldColumns();
+        $hasAutoReleaseAt = $this->hasAutoReleaseAt();
+        $hasHoldUntil = $this->hasHoldUntil();
+        $query = $this->groupStart()
                     ->groupStart()
                         ->where('bookings.status', 'pending')
                         ->where('bookings.expires_at IS NOT NULL')
                         ->where('bookings.expires_at <=', $now)
-                    ->groupEnd()
-                    ->orGroupStart()
+                    ->groupEnd();
+
+        if ($hasAutoReleaseAt) {
+            $query->orGroupStart()
                         ->where('bookings.status', 'hold')
                         ->where('bookings.auto_release_at IS NOT NULL')
                         ->where('bookings.auto_release_at <=', $now)
-                    ->groupEnd()
-                    ->groupEnd()
+                    ->groupEnd();
+        } elseif ($hasHoldUntil) {
+            $query->orGroupStart()
+                        ->where('bookings.status', 'hold')
+                        ->where('bookings.hold_until IS NOT NULL')
+                        ->where('bookings.hold_until <=', $now)
+                    ->groupEnd();
+        }
+
+        return $query->groupEnd()
                     ->where('bookings.deleted_at', null)
                     ->findAll();
     }

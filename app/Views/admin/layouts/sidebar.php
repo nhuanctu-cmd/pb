@@ -9,114 +9,143 @@
         <hr class="text-secondary">
 
         <ul class="nav flex-column">
-            <?php if ($is_superadmin ?? false): ?>
-            <li class="nav-item">
-                <a class="nav-link <?= is_active_route('admin/tenants') ?>" href="/admin/tenants">
-                    <i class="bi bi-building"></i> <?= lang('Tenant.tenants') ?>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link <?= is_active_route('admin/branches') ?>" href="/admin/branches">
-                    <i class="bi bi-diagram-3"></i> <?= lang('Tenant.branches') ?>
-                </a>
-            </li>
-            <?php endif; ?>
+            <?php
+                $segment2 = service('uri')->getSegment(2);
+                $segment3 = service('uri')->getSegment(3);
+                $isPlayersDashboard = $segment2 === 'players' && $segment3 === 'dashboard';
+                $isPlayersRanking = $segment2 === 'players' && $segment3 === 'ranking';
+            ?>
 
             <li class="nav-item">
                 <a class="nav-link <?= is_active_route('admin/dashboard') ?>" href="/admin/dashboard">
                     <i class="bi bi-speedometer2"></i> Dashboard
                 </a>
             </li>
+
             <li class="nav-item">
-                <a class="nav-link <?= is_active_route('admin/front-desk') ?>" href="/admin/front-desk">
-                    <i class="bi bi-person-workspace"></i> Front Desk
-                </a>
+                <a class="nav-link small text-white-50" href="#"><i class="bi bi-bag-check-fill"></i> Commerce Flow</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= is_active_route('admin/daily-closing') ?>" href="/admin/daily-closing">
-                    <i class="bi bi-cash-stack"></i> Daily Closing
-                </a>
+                <a class="nav-link ps-3 <?= is_active_route('admin/venue-operations') ?>" href="/admin/venue-operations">Quản lý vận hành sân</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= is_active_route('admin/owner-dashboard') ?>" href="/admin/owner-dashboard">
-                    <i class="bi bi-briefcase"></i> Owner Dashboard
-                </a>
+                <a class="nav-link ps-3 <?= is_active_route('admin/front-desk') ?>" href="/admin/front-desk">Front Desk</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= is_active_route('admin/memberships/renewals') ?>" href="/admin/memberships/renewals">
-                    <i class="bi bi-arrow-repeat"></i> Gia hạn hội viên
-                </a>
+                <a class="nav-link ps-3 <?= is_active_route('admin/owner-dashboard') ?>" href="/admin/owner-dashboard">Owner Dashboard</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= is_active_route('admin/crm-campaigns') ?>" href="/admin/crm-campaigns">
-                    <i class="bi bi-megaphone-fill"></i> CRM Campaign
-                </a>
+                <a class="nav-link ps-3 <?= is_active_route('admin/daily-closing') ?>" href="/admin/daily-closing">Daily Closing</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= is_active_route('admin/runbook') ?>" href="/admin/runbook">
-                    <i class="bi bi-journal-check"></i> Runbook vận hành
-                </a>
+                <a class="nav-link ps-3 <?= is_active_route('admin/memberships/renewals') ?>" href="/admin/memberships/renewals">Membership Renewal</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= is_active_route('admin/facilities') ?>" href="/admin/facilities">
-                    <i class="bi bi-buildings"></i> Facilities
-                </a>
+                <a class="nav-link ps-3 <?= is_active_route('admin/crm-campaigns') ?>" href="/admin/crm-campaigns">CRM Campaign</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= is_active_route('admin/bookings') ?>" href="/admin/bookings">
-                    <i class="bi bi-calendar-check"></i> <?= lang('App.bookings') ?>
-                </a>
+                <a class="nav-link ps-3 <?= is_active_route('admin/runbook') ?>" href="/admin/runbook">Runbook vận hành</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= is_active_route('admin/pricing-rules') ?>" href="/admin/pricing-rules">
-                    <i class="bi bi-cash-coin"></i> Dynamic Pricing
-                </a>
+                <a class="nav-link ps-3 <?= is_active_route('admin/runbook') ?>" href="/admin/runbook?focus=15">Runbook 15-module</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= is_active_route('admin/pos') ?>" href="/admin/pos">
-                    <i class="bi bi-cart"></i> POS Bán hàng
-                </a>
+                <a class="nav-link ps-3" href="/admin/venue-operations">Venue Control Room</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= is_active_route('admin/payments') ?>" href="/admin/payments">
-                    <i class="bi bi-credit-card"></i> Thanh toán
-                </a>
+                <a class="nav-link ps-3" href="/admin/tournaments/control-room">TV / LED Board</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= is_active_route('admin/inventory') ?>" href="/admin/pos/inventory">
-                    <i class="bi bi-box-seam"></i> Tồn kho
-                </a>
+                <a class="nav-link ps-3" href="/admin/print-center">Print Center</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= is_active_route('admin/courts') ?>" href="/admin/courts">
-                    <i class="bi bi-grid-3x3-gap-fill"></i> <?= lang('Court.courts') ?>
-                </a>
+                <a class="nav-link ps-3" href="/admin/tournament-templates">Tournament Template</a>
+            </li>
+
+            <li class="nav-item mt-2">
+                <a class="nav-link small text-white-50" href="#"><i class="bi bi-building-gear"></i> Venue & Court</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= is_active_route('admin/players') ?>" href="/admin/players">
-                    <i class="bi bi-person-vcard"></i> Players
-                </a>
+                <a class="nav-link ps-3 <?= is_active_route('admin/facilities') ?>" href="/admin/facilities">Facilities</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= is_active_route('admin/tournaments') ?>" href="/admin/tournaments/scheduler">
-                    <i class="bi bi-diagram-3"></i> Tournament Scheduler
-                </a>
+                <a class="nav-link ps-3 <?= is_active_route('admin/branches') ?>" href="/admin/branches">Branches</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link small <?= service('uri')->getSegment(2) === 'players' && service('uri')->getSegment(3) === 'dashboard' ? 'active' : '' ?>" href="/admin/players/dashboard">
-                    <i class="bi bi-speedometer2"></i> Player Dashboard
-                </a>
+                <a class="nav-link ps-3 <?= is_active_route('admin/courts') ?>" href="/admin/courts">Courts</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link small <?= service('uri')->getSegment(2) === 'players' && service('uri')->getSegment(3) === 'ranking' ? 'active' : '' ?>" href="/admin/players/ranking">
-                    <i class="bi bi-trophy"></i> Ranking
-                </a>
+                <a class="nav-link ps-3" href="/admin/courts/calendar">Court Calendar</a>
+            </li>
+
+            <li class="nav-item mt-2">
+                <a class="nav-link small text-white-50" href="#"><i class="bi bi-calendar2-check"></i> Booking & Match</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= is_active_route('admin/memberships') ?>" href="/admin/memberships">
-                    <i class="bi bi-award"></i> Memberships
+                <a class="nav-link ps-3 <?= is_active_route('admin/bookings') ?>" href="/admin/bookings">Bookings</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link ps-3 <?= is_active_route('admin/waitlist') ?>" href="/admin/waitlist">Waitlist</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link ps-3 <?= is_active_route('admin/walk-ins') ?>" href="/admin/walk-ins">Walk-in</a>
+            </li>
+
+            <li class="nav-item mt-2">
+                <a class="nav-link small text-white-50" href="#"><i class="bi bi-calendar-check"></i> Tournament</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link ps-3 <?= is_active_route('admin/tournaments') ?>" href="/admin/tournaments/scheduler">Tournament Scheduler</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link ps-3" href="/admin/tournament-templates">Tournament Templates</a>
+            </li>
+
+            <li class="nav-item mt-2">
+                <a class="nav-link small text-white-50" href="#"><i class="bi bi-people-fill"></i> Membership & Users</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link ps-3 <?= is_active_route('admin/memberships') ?>" href="/admin/memberships">Memberships</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link ps-3 <?= is_active_route('admin/players') ?>" href="/admin/players">Players</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link ps-3 <?= $isPlayersDashboard ? 'active' : '' ?>" href="/admin/players/dashboard">Player Dashboard</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link ps-3 <?= $isPlayersRanking ? 'active' : '' ?>" href="/admin/players/ranking">Player Ranking</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link ps-3 <?= is_active_route('admin/clubs') ?>" href="/admin/clubs">Clubs</a>
+            </li>
+
+            <li class="nav-item mt-2">
+                <a class="nav-link small text-white-50" href="#"><i class="bi bi-shop-window"></i> Revenue & POS</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link ps-3 <?= is_active_route('admin/payments') ?>" href="/admin/payments">Thanh toán</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link ps-3 <?= is_active_route('admin/pos') ?>" href="/admin/pos">POS Bán hàng</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link ps-3 <?= is_active_route('admin/inventory') ?>" href="/admin/pos/inventory">Tồn kho</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link ps-3 <?= is_active_route('admin/pricing-rules') ?>" href="/admin/pricing-rules">Dynamic Pricing</a>
+            </li>
+
+            <?php if ($is_superadmin ?? false): ?>
+            <li class="nav-item mt-3">
+                <a class="nav-link small text-white-50" href="#"><i class="bi bi-briefcase-fill"></i> Super Admin</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link ps-3 <?= is_active_route('admin/tenants') ?>" href="/admin/tenants">
+                    <i class="bi bi-building"></i> <?= lang('Tenant.tenants') ?>
                 </a>
             </li>
+            <?php endif; ?>
 
             <li class="nav-item mt-3">
                 <span class="nav-link text-secondary text-uppercase small">System</span>
@@ -139,6 +168,41 @@
             <li class="nav-item">
                 <a class="nav-link <?= is_active_route('admin/audit-logs') ?>" href="/admin/audit-logs">
                     <i class="bi bi-journal-text"></i> Audit Logs
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/venues" target="_blank">
+                    <i class="bi bi-globe2"></i> Xem Public Venue
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/clubs" target="_blank">
+                    <i class="bi bi-people-fill"></i> Xem Public Club
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/api/v1/facilities?tenant_id=<?= (int) (current_tenant_id() ?: 1) ?>" target="_blank">
+                    <i class="bi bi-code-slash"></i> Test API Venue
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/admin/facilities" target="_blank">
+                    <i class="bi bi-diagram-3"></i> Facility-Club Partnership
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/api/v1/branches?tenant_id=<?= (int) (current_tenant_id() ?: 1) ?>" target="_blank">
+                    <i class="bi bi-terminal-dash"></i> API chuẩn
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/admin/audit-logs" target="_blank">
+                    <i class="bi bi-shield-lock"></i> Security Hardening
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/admin/runbook" target="_blank">
+                    <i class="bi bi-play-btn"></i> One-Click Runbook
                 </a>
             </li>
         </ul>

@@ -399,21 +399,24 @@ class MembershipService
 
         $payload['target'] = $target;
         $sendResult = $this->mockDelivery((string) $channel, $payload, $testMode);
-        $notes = ($testMode ? '[TEST] ' : '') . trim((string) $sendResult['message']);
-        $this->recordHistory(
-            (int) $tenantId,
-            (int) $membership->id,
-            (int) $membership->player_id,
-            (int) $membership->package_id,
-            (int) $membership->package_id,
-            (string) $membership->start_date,
-            (string) $membership->end_date,
-            null,
-            null,
-            'reminder',
-            $actorUserId,
-            $notes
-        );
+        if (! $testMode) {
+            $this->recordHistory(
+                (int) $tenantId,
+                (int) $membership->id,
+                (int) $membership->player_id,
+                (int) $membership->package_id,
+                (int) $membership->package_id,
+                (string) $membership->start_date,
+                (string) $membership->end_date,
+                null,
+                null,
+                'reminder',
+                $actorUserId,
+                trim((string) $sendResult['message'])
+            );
+        } else {
+            log_message('info', '[MembershipReminder:TEST] dry-run for tenant=' . $tenantId . ', membership=' . $membership->id . ', target=' . $target);
+        }
 
         return [
             'success' => (bool) $sendResult['ok'],

@@ -81,6 +81,297 @@ class PublicPortalService
         return ['players' => $players, 'clubs' => $clubs, 'tournaments' => $tournaments];
     }
 
+    public function venueList(int $tenantId, array $filters = []): array
+    {
+        $search = trim((string) ($filters['q'] ?? $filters['search'] ?? ''));
+        $status = (string) ($filters['status'] ?? '');
+
+        try {
+            $builder = $this->db->table('facilities f')
+                ->select('f.id, f.code, f.name_vi, f.name_en, f.address, f.city, f.district, f.phone, f.email, f.status, f.total_branches, f.total_courts')
+                ->where('f.tenant_id', $tenantId)
+                ->where('f.deleted_at', null)
+                ->orderBy('f.name_vi', 'ASC');
+
+            if ($status !== '') {
+                $builder->where('f.status', $status);
+            }
+            if ($search !== '') {
+                $builder->groupStart()
+                    ->like('f.name_vi', '%' . $this->db->escapeLikeString($search) . '%', 'both', null, true)
+                    ->orLike('f.name_en', '%' . $this->db->escapeLikeString($search) . '%', 'both', null, true)
+                    ->orLike('f.address', '%' . $this->db->escapeLikeString($search) . '%', 'both', null, true)
+                    ->groupEnd();
+            }
+
+            $venues = $builder->get()->getResult();
+            foreach ($venues as $venue) {
+                $venue->slug = (string) $venue->id;
+                $venue->branch_count = (int) $this->db->table('branches')
+                    ->where('facility_id', (int) $venue->id)
+                    ->where('tenant_id', $tenantId)
+                    ->where('deleted_at', null)
+                    ->countAllResults();
+
+                $branchRows = $this->db->table('branches')
+                    ->select('id')
+                    ->where('facility_id', (int) $venue->id)
+                    ->where('tenant_id', $tenantId)
+                    ->where('deleted_at', null)
+                    ->get()
+                    ->getResult();
+                $branchIds = array_map(static fn ($row) => (int) $row->id, (array) $branchRows);
+                $venue->court_count = $branchIds
+                    ? (int) $this->db->table('courts')
+                        ->where('tenant_id', $tenantId)
+                        ->where('deleted_at', null)
+                        ->whereIn('branch_id', $branchIds)
+                        ->countAllResults()
+                    : 0;
+                $venue->club_count = (int) $this->db->table('facility_club_assignments')->where('tenant_id', $tenantId)->where('facility_id', (int) $venue->id)->where('status', 'active')->countAllResults();
+            }
+
+            return array_values((array) $venues);
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    public function venueDetail(string $identifier, int $tenantId, string $activeTab = 'overview'): ?array
+    {
+        $id = (int) $identifier;
+        try {
+            $builder = $this->db->table('facilities f')
+                ->select('f.*')
+                ->where('f.tenant_id', $tenantId)
+                ->where('f.deleted_at', null);
+            if ($id > 0) {
+                $builder->where('f.id', $id);
+            } else {
+                $builder->where('f.code', $identifier);
+            }
+            $venue = $builder->get()->getRow();
+            if (! $venue) {
+                return null;
+            }
+
+            $branches = $this->db->table('branches b')
+                ->select('b.id,b.code,b.name,b.branch_type,b.status,b.total_courts,b.city,b.district,b.phone,b.address')
+                ->where('b.tenant_id', $tenantId)
+                ->where('b.deleted_at', null)
+                ->where('b.facility_id', (int) $venue->id)
+                ->orderBy('b.is_main', 'DESC')
+                ->orderBy('b.name', 'ASC')
+                ->get()->getResult();
+
+            $assignedClubs = $this->db->table('facility_club_assignments a')
+                ->select('a.*, c.id AS club_id, c.name_vi, c.name_en, c.logo, c.status AS club_status')
+                ->join('clubs c', 'c.id = a.club_id AND c.deleted_at IS NULL')
+                ->where('a.tenant_id', $tenantId)
+                ->where('a.facility_id', (int) $venue->id)
+                ->where('a.status', 'active')
+                ->get()->getResult();
+
+            $branchIds = array_map(static fn ($row) => (int) ($row->id ?? 0), (array) $branches);
+            $courtSchedule = [];
+            if (! empty($branchIds)) {
+                $courtSchedule = $this->db->table('bookings b')
+                    ->select('b.id, b.booking_date, b.start_time, b.end_time, b.status, b.customer_name, b.checked_in_at, bi.court_id, c.code AS court_code, br.name AS branch_name, p.full_name AS player_name, p.id AS player_id')
+                    ->join('booking_items bi', 'bi.booking_id = b.id', 'left')
+                    ->join('courts c', 'c.id = bi.court_id', 'left')
+                    ->join('branches br', 'br.id = b.branch_id', 'left')
+                    ->join('players p', 'p.id = b.player_id AND p.tenant_id = b.tenant_id AND p.deleted_at IS NULL', 'left')
+                    ->where('b.tenant_id', $tenantId)
+                    ->whereIn('b.branch_id', $branchIds)
+                    ->where('b.deleted_at', null)
+                    ->whereIn('b.status', ['reserved', 'paid', 'checked_in', 'in_progress'])
+                    ->where('b.booking_date >=', date('Y-m-d'))
+                    ->orderBy('b.booking_date', 'ASC')
+                    ->orderBy('b.start_time', 'ASC')
+                    ->limit(80)
+                    ->get()->getResult();
+            }
+
+            $courtGrid = [];
+            foreach ($branches as $branch) {
+                $branchCourts = $this->db->table('courts')
+                    ->select('id, code, name_vi AS name, status')
+                    ->where('branch_id', (int) $branch->id)
+                    ->where('deleted_at', null)
+                    ->orderBy('code', 'ASC')
+                    ->get()->getResult();
+                $branch->courts = $branchCourts;
+                $courtGrid[(int) $branch->id] = $branchCourts;
+            }
+
+            foreach ($branches as $branch) {
+                $branch->court_count = (int) $this->db->table('courts')->where('branch_id', (int) $branch->id)->where('deleted_at', null)->countAllResults();
+                $branch->court_active = (int) $this->db->table('courts')->where('branch_id', (int) $branch->id)->where('deleted_at', null)->where('status', 'available')->countAllResults();
+                $branch->booking_in_progress = (int) $this->db->table('booking_items bi')
+                    ->join('bookings b', 'b.id = bi.booking_id')
+                    ->where('bi.branch_id', (int) $branch->id)
+                    ->where('b.status', 'in_progress')
+                    ->where('bi.deleted_at', null)
+                    ->where('b.deleted_at', null)
+                    ->countAllResults();
+            }
+
+            return [
+                'venue' => $venue,
+                'branches' => $branches,
+                'clubs' => $assignedClubs,
+                'activeTab' => in_array($activeTab, ['overview', 'courts', 'schedule', 'members', 'history'], true) ? $activeTab : 'overview',
+                'court_grid' => $courtGrid,
+                'court_schedule' => $courtSchedule,
+            ];
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    public function clubList(int $tenantId, array $filters = []): array
+    {
+        $search = trim((string) ($filters['q'] ?? $filters['search'] ?? ''));
+        $status = (string) ($filters['status'] ?? '');
+        $limit = min(200, max(1, (int) ($filters['limit'] ?? 120)));
+
+        try {
+            $builder = $this->db->table('clubs c')
+                ->select('c.id, c.name_vi, c.name_en, c.logo, c.description_vi, c.description_en, c.status, c.created_at')
+                ->where('c.tenant_id', $tenantId)
+                ->where('c.deleted_at', null)
+                ->orderBy('c.name_vi', 'ASC')
+                ->limit($limit);
+
+            if ($status !== '') {
+                $builder->where('c.status', $status);
+            }
+            if ($search !== '') {
+                $builder->groupStart()
+                    ->like('c.name_vi', '%' . $this->db->escapeLikeString($search) . '%', 'both', null, true)
+                    ->orLike('c.name_en', '%' . $this->db->escapeLikeString($search) . '%', 'both', null, true)
+                    ->groupEnd();
+            }
+            $clubs = $builder->get()->getResult();
+
+            foreach ($clubs as $club) {
+                $club->member_count = (int) $this->db->table('player_club_memberships')
+                    ->where('tenant_id', $tenantId)->where('club_id', (int) $club->id)->where('status', 'active')->countAllResults();
+            }
+
+            return array_values((array) $clubs);
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    public function clubDetail(string|int $identifier, int $tenantId, string $activeTab = 'overview'): ?array
+    {
+        try {
+            $id = (int) $identifier;
+            $club = $this->db->table('clubs')
+                ->select('id, name_vi, name_en, logo, description_vi, description_en, status, created_at')
+                ->where('id', $id)
+                ->where('tenant_id', $tenantId)
+                ->where('deleted_at', null)
+                ->get()->getRow();
+            if (! $club) {
+                return null;
+            }
+
+            $members = $this->db->table('player_club_memberships pcm')
+                ->select('pcm.id, pcm.role, pcm.joined_at, p.id AS player_id, p.full_name, p.player_code, p.phone, p.region')
+                ->join('players p', 'p.id = pcm.player_id', 'left')
+                ->where('pcm.tenant_id', $tenantId)
+                ->where('pcm.club_id', $id)
+                ->where('pcm.status', 'active')
+                ->where('pcm.deleted_at IS NULL')
+                ->orderBy('pcm.is_primary', 'DESC')
+                ->orderBy('p.full_name', 'ASC')
+                ->limit(200)
+                ->get()->getResult();
+
+            $memberRows = $this->db->table('player_club_memberships pcm')
+                ->select('pcm.player_id')
+                ->where('pcm.tenant_id', $tenantId)
+                ->where('pcm.club_id', $id)
+                ->where('pcm.status', 'active')
+                ->get()
+                ->getResult();
+
+            $memberIds = array_map(static fn ($row) => (int) ($row->player_id ?? 0), (array) $memberRows);
+            $history = [];
+            if (! empty($memberIds)) {
+                $history = $this->db->table('player_match_history hm')
+                    ->select('hm.match_date, hm.result, hm.score, p.full_name AS player_name, p.id AS player_id, t.name_vi AS tournament_name')
+                    ->join('players p', 'p.id = hm.player_id', 'left')
+                    ->join('tournaments t', 't.id = hm.tournament_id', 'left')
+                    ->where('hm.tenant_id', $tenantId)
+                    ->whereIn('hm.player_id', $memberIds)
+                    ->orderBy('hm.match_date', 'DESC')
+                    ->limit(25)
+                    ->get()->getResult();
+            }
+
+            $posts = [];
+            if ($this->db->tableExists('community_posts')) {
+                $postQuery = $this->db->table('community_posts')
+                    ->select('id, title, type, created_at')
+                    ->where('tenant_id', $tenantId)
+                    ->where('status', 'published')
+                    ->where('deleted_at', null);
+                if ($this->db->fieldExists('club_id', 'community_posts')) {
+                    $postQuery->where('club_id', $id);
+                } else {
+                    $postQuery->where('title IS NOT NULL');
+                }
+                $posts = $postQuery->orderBy('created_at', 'DESC')->limit(15)->get()->getResult();
+            }
+
+            $tournaments = [];
+            if ($this->db->tableExists('tournament_registrations')) {
+                $tournaments = $this->db->table('tournament_registrations tr')
+                    ->select('tr.id, t.name_vi AS tournament_name, tr.status, tr.registered_at')
+                    ->join('tournaments t', 't.id = tr.tournament_id', 'left')
+                    ->where('tr.tenant_id', $tenantId)
+                    ->where('tr.club_id', $id)
+                    ->orderBy('tr.registered_at', 'DESC')
+                    ->limit(30)
+                    ->get()->getResult();
+            }
+
+            $activeTab = in_array($activeTab, ['overview', 'members', 'history', 'posts', 'tournaments'], true) ? $activeTab : 'overview';
+            $tabs = [
+                'overview' => [
+                    'members' => count($members),
+                    'history' => count($history),
+                    'posts' => count($posts),
+                    'tournaments' => count($tournaments),
+                ],
+                'members' => ['total' => count($members)],
+                'history' => ['total' => count($history)],
+                'posts' => ['total' => count($posts)],
+                'tournaments' => ['total' => count($tournaments)],
+            ];
+            foreach ($members as $member) {
+                $member->profile_url = '/players/' . (int) $member->player_id;
+                $member->match_link = '/players/' . (int) $member->player_id . '#matches';
+            }
+
+            return [
+                'club' => $club,
+                'active_tab' => $activeTab,
+                'tabs' => $tabs,
+                'members' => $members,
+                'history' => $history,
+                'posts' => $posts,
+                'tournaments' => $tournaments,
+            ];
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     public function topRankingsForPublic(int $tenantId, string $discipline = 'singles'): array
     {
         return $this->topRankings($tenantId, $discipline);
@@ -140,6 +431,9 @@ class PublicPortalService
                 'posts' => $posts,
                 'stats' => ['matches' => count($matches), 'wins' => $wins, 'losses' => $losses, 'winRate' => count($matches) ? round($wins / count($matches) * 100) : 0, 'rating' => $primaryRating?->rating_value ?? $player->rating_score ?? null, 'reliability' => $primaryRating?->reliability_score ?? 0],
                 'clubName' => $this->publicClubName((int) ($player->club_id ?? 0), $tenantId),
+                'clubId' => (int) ($player->club_id ?? 0),
+                'clubProfileUrl' => (int) ($player->club_id ?? 0) > 0 ? '/clubs/' . (int) ($player->club_id) : null,
+                'clubProfileName' => $this->publicClubName((int) ($player->club_id ?? 0), $tenantId),
             ];
         } catch (\Throwable) {
             return null;

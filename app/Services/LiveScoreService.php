@@ -3,17 +3,24 @@
 namespace App\Services;
 
 use CodeIgniter\Database\BaseConnection;
+use DateTime;
 
 class LiveScoreService
 {
     protected BaseConnection $db;
+
+    private const TV_SEQUENCE = ['live', 'next', 'call', 'results'];
+    private const LIVE_STATUSES = ['on_court', 'running', 'in_progress', 'live', 'playing'];
+    private const CALLED_STATUSES = ['called', 'prepared', 'on_deck', 'calling'];
+    private const NEXT_STATUSES = ['scheduled', 'pending', 'delayed', 'upcoming', 'queue'];
+    private const RESULT_STATUSES = ['completed', 'finished', 'walkover', 'defaulted'];
 
     public function __construct()
     {
         $this->db = \Config\Database::connect();
     }
 
-    public function getLiveMatches(?int $tenantId = null, ?int $tournamentId = null): array
+    public function getLiveMatches(?int $tenantId = null, ?int $tournamentId = null, array $options = []): array
     {
         if (! $tenantId || ! $this->db->tableExists('tournament_matches')) {
             return [];
@@ -26,8 +33,14 @@ class LiveScoreService
         if ($tournamentId && $this->fieldExists('tournament_matches', 'tournament_id')) {
             $builder->where('m.tournament_id', $tournamentId);
         }
+        if (! empty($options['date']) && $this->fieldExists('tournament_matches', 'scheduled_date')) {
+            $builder->where('m.scheduled_date', $options['date']);
+        }
+        if (! empty($options['branch_id']) && $this->fieldExists('tournament_matches', 'branch_id')) {
+            $builder->where('m.branch_id', (int) $options['branch_id']);
+        }
         if ($this->fieldExists('tournament_matches', 'status')) {
-            $builder->whereIn('m.status', ['scheduled', 'pending', 'called', 'on_court', 'running', 'in_progress', 'delayed', 'completed', 'walkover']);
+            $builder->whereIn('m.status', array_unique(array_merge(self::LIVE_STATUSES, self::CALLED_STATUSES, self::NEXT_STATUSES, self::RESULT_STATUSES)));
         }
 
         if ($this->db->tableExists('teams')) {
@@ -37,7 +50,12 @@ class LiveScoreService
                 ->join('courts co', 'co.id = m.court_id AND co.tenant_id = m.tenant_id', 'left')
                 ->join('tournament_categories c', 'c.id = m.category_id AND c.tenant_id = m.tenant_id', 'left');
         }
-        $matches = $builder->orderBy('m.scheduled_date', 'ASC')->orderBy('m.start_time', 'ASC')->orderBy('m.id', 'ASC')->limit(100)->get()->getResult();
+        $matches = $builder->orderBy('m.scheduled_date', 'ASC')
+            ->orderBy('m.start_time', 'ASC')
+            ->orderBy('m.id', 'ASC')
+            ->limit(100)
+            ->get()
+            ->getResult();
         foreach ($matches as $match) {
             $match->scores = $this->getScores((int) $match->id, $tenantId);
             $match->score_text = $this->formatScore($match->scores);
@@ -50,11 +68,26 @@ class LiveScoreService
 
     public function getTvDisplayData(?int $tenantId = null, ?int $tournamentId = null, array $options = []): array
     {
-        $matches = $this->getLiveMatches($tenantId, $tournamentId);
-        $live = array_values(array_filter($matches, static fn ($m) => in_array(($m->status ?? ''), ['on_court', 'running', 'in_progress'], true)));
-        $called = array_values(array_filter($matches, static fn ($m) => ($m->status ?? '') === 'called'));
-        $next = array_values(array_filter($matches, static fn ($m) => in_array(($m->status ?? 'scheduled'), ['scheduled', 'pending', 'delayed'], true)));
-        $results = array_values(array_filter($matches, static fn ($m) => in_array(($m->status ?? ''), ['completed', 'walkover'], true)));
+        $date = $this->normalizeDate($options['date'] ?? null);
+        $matches = $this->getLiveMatches($tenantId, $tournamentId, [
+            'date' => $date,
+            'branch_id' => $options['branch_id'] ?? null,
+        ]);
+        $isMatchStatus = static function (string $status, array $statuses): bool {
+            return in_array($status, $statuses, true);
+        };
+        $live = array_values(array_filter($matches, static function (object $m) use ($isMatchStatus): bool {
+            return $isMatchStatus((string) ($m->status ?? ''), self::LIVE_STATUSES);
+        }));
+        $called = array_values(array_filter($matches, static function (object $m) use ($isMatchStatus): bool {
+            return $isMatchStatus((string) ($m->status ?? ''), self::CALLED_STATUSES);
+        }));
+        $next = array_values(array_filter($matches, static function (object $m) use ($isMatchStatus): bool {
+            return $isMatchStatus((string) ($m->status ?? 'scheduled'), self::NEXT_STATUSES);
+        }));
+        $results = array_values(array_filter($matches, static function (object $m) use ($isMatchStatus): bool {
+            return $isMatchStatus((string) ($m->status ?? ''), self::RESULT_STATUSES);
+        }));
         $tournament = null;
         if ($tournamentId && $this->db->tableExists('tournaments')) {
             $tournament = $this->db->table('tournaments')->where('id', $tournamentId)->where('tenant_id', $tenantId)->where('deleted_at', null)->get()->getRow();
@@ -84,6 +117,38 @@ class LiveScoreService
             $refreshSeconds = (int) $options['refresh_seconds'];
         }
 
+        $sequence = $this->normalizeTvSequence($options['sequence'] ?? null);
+        $refreshSeconds = (int) ($options['refresh_seconds'] ?? 10);
+        if ($refreshSeconds <= 0) {
+            $refreshSeconds = 10;
+        }
+        if ($refreshSeconds < 5) {
+            $refreshSeconds = 5;
+        }
+
+        if ($refreshSeconds > 120) {
+            $refreshSeconds = 120;
+        }
+
+        if ($config && is_numeric((string) ($config->refresh_seconds ?? null)) && (int) $config->refresh_seconds > 0) {
+            $refreshSeconds = (int) $config->refresh_seconds;
+            if ($refreshSeconds < 5) {
+                $refreshSeconds = 5;
+            }
+            if ($refreshSeconds > 120) {
+                $refreshSeconds = 120;
+            }
+        }
+
+        $sequence = $this->normalizeTvSequence($options['sequence'] ?? null);
+        $sequenceRequestedByUser = $sequence;
+        if (empty($sequenceRequestedByUser)) {
+            $sequenceRequestedByUser = self::TV_SEQUENCE;
+        }
+        if (isset($options['sequence']) && empty((string) $options['sequence'])) {
+            $sequenceRequestedByUser = self::TV_SEQUENCE;
+        }
+
         return [
             'config' => $config,
             'tournament' => $tournament,
@@ -91,8 +156,11 @@ class LiveScoreService
             'called_matches' => $called,
             'next_matches' => $next,
             'result_matches' => array_slice(array_reverse($results), 0, 6),
-            'slides' => $sequence,
+            'slides' => $sequenceRequestedByUser,
+            'sequence' => $sequenceRequestedByUser,
             'refresh_seconds' => $refreshSeconds,
+            'date' => $date,
+            'branch_id' => $options['branch_id'] ?? null,
             'show_sponsor' => (bool) ($config->show_sponsor ?? true),
             'show_next_matches' => (bool) ($config->show_next_matches ?? true),
         ];
@@ -153,7 +221,7 @@ class LiveScoreService
 
     private function normalizeTvSequence($sequence): array
     {
-        $allowed = ['live', 'next', 'call', 'results'];
+        $allowed = self::TV_SEQUENCE;
         if (is_string($sequence)) {
             $sequence = preg_split('/\s*,\s*/', trim($sequence), -1, PREG_SPLIT_NO_EMPTY);
         }
@@ -172,5 +240,33 @@ class LiveScoreService
         }
 
         return $normalized ?: $allowed;
+    }
+
+    public function tvQueryDefaults(array $request): array
+    {
+        return [
+            'sequence' => $request['sequence'] ?? null,
+            'refresh_seconds' => is_numeric($request['refresh'] ?? null) ? (int) $request['refresh'] : null,
+            'branch_id' => is_numeric($request['branch_id'] ?? null) ? (int) $request['branch_id'] : null,
+            'date' => $this->normalizeDate($request['date'] ?? null),
+        ];
+    }
+
+    private function normalizeDate(?string $value): ?string
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        $parsed = DateTime::createFromFormat('Y-m-d', (string) $value);
+        if (! $parsed || $parsed->format('Y-m-d') !== (string) $value) {
+            $timestamp = strtotime((string) $value);
+            if (! $timestamp) {
+                return null;
+            }
+            $parsed = (new DateTime())->setTimestamp($timestamp);
+        }
+
+        return $parsed->format('Y-m-d');
     }
 }

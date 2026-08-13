@@ -127,7 +127,15 @@
                                 <button type="submit" class="btn btn-login w-100 btn-lg"><?= lang('Auth.login') ?></button>
                             </form>
 
-                            <?php if (ENVIRONMENT !== 'production'): ?>
+                            <?php
+                            $host = strtolower((string) request()->getServer('HTTP_HOST'));
+                            $isLocalHost = (
+                                strpos($host, 'localhost') !== false
+                                || strpos($host, '127.0.0.1') !== false
+                                || ENVIRONMENT !== 'production'
+                            );
+                            ?>
+                            <?php if ($isLocalHost): ?>
                             <div class="demo-accounts mt-4 pt-3 border-top">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <span class="fw-bold text-secondary"><i class="bi bi-person-badge"></i> <?= lang('Auth.demoAccounts') ?></span>
